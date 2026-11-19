@@ -1,0 +1,1368 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ORION Assistente</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="ORION: assistente pessoal com inteligência artificial para Windows. Conversa por voz, organiza seu dia, controla gastos e treinos, mostra hologramas 3D e muito mais.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Exo+2:wght@300;400;500;600;700&family=Michroma&display=swap">
+<style>
+/* Layout: central de comando holográfica. Boot de sistema, esfera viva no centro do hero, painel real em mock 3D, faixas HUD e cartões com borda de energia. */
+:root {
+  color-scheme: dark;
+  --bg: #02070f;          /* vácuo do painel */
+  --bg2: #051327;         /* faixa alternada */
+  --panel: rgba(8, 26, 48, .66);
+  --line: rgba(79, 216, 255, .28);
+  --line2: rgba(79, 216, 255, .12);
+  --fg: #e3f7ff;          /* texto principal */
+  --muted: #8eaec6;       /* texto de apoio */
+  --cyan: #4fd8ff;        /* holograma */
+  --ice: #b8f3ff;         /* brilho */
+  --gold: #ffb84d;        /* destaque */
+  --green: #5be3a1;       /* ok / ouvindo */
+  --ink: #021019;         /* texto sobre ciano */
+  --disp: "Orbitron", "Exo 2", system-ui, sans-serif;
+  --body: "Exo 2", "Segoe UI", system-ui, sans-serif;
+  --label: "Michroma", "Orbitron", system-ui, sans-serif;
+  --r: 16px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 17.5px; line-height: 1.6; font-weight: 400; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 80; background: var(--bg); }
+::selection { background: var(--cyan); color: var(--ink); }
+a { color: var(--cyan); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; border-radius: 8px; }
+h1, h2, h3 { font-family: var(--disp); text-wrap: balance; margin: 0; letter-spacing: .03em; font-weight: 700; }
+p { margin: 0; }
+
+/* fundo: rede de partículas + grade + varredura + brilho do cursor */
+#net { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.grid-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .45;
+  background-image: linear-gradient(var(--line2) 1px, transparent 1px), linear-gradient(90deg, var(--line2) 1px, transparent 1px); background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 85% 55% at 50% 25%, #000 25%, transparent 75%); }
+.scan { position: fixed; inset: 0; z-index: 1; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(79,216,255,.03) 0 1px, transparent 1px 4px); }
+.sweep { position: fixed; left: 0; right: 0; top: -20%; height: 18%; z-index: 1; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(79,216,255,.05), transparent); animation: sweep 9s linear infinite; }
+#glow { position: fixed; z-index: 1; width: 560px; height: 560px; left: 0; top: 0; margin: -280px 0 0 -280px; border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, rgba(79,216,255,.10), transparent 62%); transition: opacity .4s; }
+#progress { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; height: 2px; width: 100%; transform-origin: left; transform: scaleX(0); z-index: 90;
+  background: linear-gradient(90deg, var(--cyan), var(--ice)); box-shadow: 0 0 12px var(--cyan); }
+header, main, footer { position: relative; z-index: 2; }
+.wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font-family: var(--label); font-size: 10.5px; letter-spacing: .32em; text-transform: uppercase; color: var(--cyan); display: inline-flex; align-items: center; gap: 12px; }
+.eyebrow::before { content: ""; width: 28px; height: 1px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.shine { background: linear-gradient(100deg, var(--fg) 20%, var(--ice) 40%, var(--cyan) 50%, var(--fg) 70%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 7s linear infinite; }
+.accent { color: var(--cyan); text-shadow: 0 0 22px rgba(79, 216, 255, .55); }
+
+/* ---------------- boot */
+#boot { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; transition: opacity .6s, visibility .6s; cursor: pointer; }
+#boot.off { opacity: 0; visibility: hidden; }
+.boot-in { display: grid; gap: 20px; justify-items: center; width: min(420px, 86vw); }
+.boot-ring { width: 120px; height: 120px; border-radius: 50%; position: relative; }
+.boot-ring::before, .boot-ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--cyan); border-right-color: var(--cyan); animation: spin 1.1s linear infinite; box-shadow: 0 0 22px rgba(79,216,255,.25); }
+.boot-ring::after { inset: 16px; border-top-color: var(--gold); border-right-color: transparent; border-left-color: var(--gold); animation-duration: 1.6s; animation-direction: reverse; }
+.boot-ring i { position: absolute; inset: 44px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--cyan) 70%); box-shadow: 0 0 30px var(--cyan); animation: pulse 1s ease-in-out infinite; }
+.boot-name { font-family: var(--disp); font-size: 26px; letter-spacing: .6em; color: var(--cyan); margin-right: -.6em; }
+.boot-log { font-family: var(--label); font-size: 10px; letter-spacing: .14em; color: var(--muted); width: 100%; display: grid; gap: 6px; min-height: 92px; }
+.boot-log div { display: flex; justify-content: space-between; animation: pop .25s ease-out; }
+.boot-log b { color: var(--green); font-weight: 400; }
+.boot-bar { width: 100%; height: 2px; background: var(--line2); overflow: hidden; }
+.boot-bar i { display: block; height: 100%; width: 0; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); transition: width .25s; }
+.boot-skip { font-size: 12px; color: var(--muted); letter-spacing: .1em; }
+
+/* ---------------- topo */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; transition: background .3s, border-color .3s; border-bottom: 1px solid transparent; }
+.top.solid { background: rgba(2, 7, 15, .78); backdrop-filter: blur(14px); border-bottom-color: var(--line2); }
+.top .wrap { display: flex; align-items: center; gap: 22px; padding-block: 14px; }
+.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--fg); }
+.logo { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--cyan); display: grid; place-items: center; box-shadow: 0 0 14px var(--cyan), inset 0 0 10px rgba(79,216,255,.45); position: relative; }
+.logo::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px dashed rgba(79,216,255,.5); animation: spin 12s linear infinite; }
+.logo span { width: 11px; height: 11px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--cyan) 70%); animation: pulse 3s ease-in-out infinite; }
+.brand b { font-family: var(--disp); font-size: 18px; letter-spacing: .42em; color: var(--cyan); }
+.menu { margin-left: auto; display: flex; gap: 26px; }
+.menu a { color: var(--muted); text-decoration: none; font-weight: 500; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; position: relative; padding-block: 4px; transition: color .2s; }
+.menu a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); transform: scaleX(0); transition: transform .3s var(--ease); }
+.menu a:hover { color: var(--fg); } .menu a:hover::after { transform: scaleX(1); }
+.sound { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 7px 12px; font-family: var(--label); font-size: 9.5px; letter-spacing: .18em; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+.sound i { display: inline-flex; gap: 2px; align-items: flex-end; height: 10px; }
+.sound i b { width: 2px; background: currentColor; height: 30%; }
+.sound.on { color: var(--cyan); border-color: var(--cyan); }
+.sound.on i b { animation: eq .9s ease-in-out infinite; } .sound.on i b:nth-child(2) { animation-delay: .2s; } .sound.on i b:nth-child(3) { animation-delay: .4s; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border-radius: 999px; padding: 14px 26px; font-family: var(--disp); font-size: 12.5px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; text-decoration: none; cursor: pointer; border: 1px solid var(--cyan); position: relative; overflow: hidden; transition: box-shadow .25s, background .25s, color .25s; will-change: transform; white-space: nowrap; }
+.btn.pri { background: linear-gradient(135deg, var(--ice), var(--cyan)); color: var(--ink); box-shadow: 0 0 24px rgba(79, 216, 255, .45), inset 0 1px 0 rgba(255,255,255,.6); }
+.btn.pri::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.65) 50%, transparent 70%); transform: translateX(-120%); animation: shine 3.8s ease-in-out infinite; }
+.btn.ghost { background: rgba(79, 216, 255, .06); color: var(--cyan); }
+.btn.ghost:hover { background: rgba(79, 216, 255, .14); }
+.btn:hover { box-shadow: 0 0 36px rgba(79, 216, 255, .6); }
+.top .btn { padding: 10px 18px; font-size: 10.5px; }
+
+/* ---------------- hero */
+.hero { padding-block: 40px 30px; }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.02fr; gap: 28px; align-items: center; }
+.hero h1 { font-size: clamp(32px, 4.3vw, 56px); line-height: 1.06; margin: 18px 0 20px; font-weight: 900; }
+.hero .lead { font-size: 20px; color: var(--muted); max-width: 33em; font-weight: 300; }
+.hero .lead b { color: var(--fg); font-weight: 600; }
+.term { margin-top: 24px; font-family: var(--label); font-size: 12px; color: var(--green); letter-spacing: .06em; padding: 12px 14px; border: 1px solid var(--line2); border-radius: 10px; background: rgba(2, 10, 20, .7); display: flex; gap: 10px; align-items: center; min-height: 46px; max-width: 520px; }
+.term::before { content: "ORION://"; color: var(--muted); }
+.term span::after { content: "▌"; animation: blink 1s steps(1) infinite; margin-left: 2px; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.trust { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 26px; color: var(--muted); font-size: 14px; }
+.trust span { display: inline-flex; gap: 8px; align-items: center; }
+.trust span::before { content: ""; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--green); background: radial-gradient(circle, var(--green) 30%, transparent 35%); }
+
+.orb-box { position: relative; aspect-ratio: 1 / 1; width: 100%; max-width: 600px; margin-inline: auto; }
+.orb-box canvas#orb { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; z-index: 2; }
+.orb-box canvas.grab { cursor: grabbing; }
+.dial { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.dial .spin { transform-origin: 50% 50%; animation: spin 40s linear infinite; }
+.dial .spin2 { transform-origin: 50% 50%; animation: spin 14s linear infinite reverse; }
+.dial .spin3 { transform-origin: 50% 50%; animation: spin 7s linear infinite; }
+.radar { position: absolute; inset: 9%; border-radius: 50%; z-index: 1; pointer-events: none; background: conic-gradient(from 0deg, rgba(79,216,255,.16), transparent 18%); animation: spin 5s linear infinite;
+  mask-image: radial-gradient(circle, transparent 55%, #000 56%, #000 70%, transparent 71%); }
+.corner { position: absolute; width: 28px; height: 28px; border: 2px solid var(--cyan); z-index: 3; pointer-events: none; opacity: .8; filter: drop-shadow(0 0 6px var(--cyan)); }
+.corner.a { top: 0; left: 0; border-right: 0; border-bottom: 0; } .corner.b { top: 0; right: 0; border-left: 0; border-bottom: 0; }
+.corner.c { bottom: 0; left: 0; border-right: 0; border-top: 0; } .corner.d { bottom: 0; right: 0; border-left: 0; border-top: 0; }
+.hud-tag { position: absolute; z-index: 3; font-family: var(--label); font-size: 9.5px; letter-spacing: .2em; color: var(--muted); pointer-events: none; display: grid; gap: 5px; }
+.hud-tag b { color: var(--cyan); font-weight: 400; font-size: 11px; }
+.hud-tag .bars { display: flex; gap: 2px; height: 10px; align-items: flex-end; }
+.hud-tag .bars i { width: 3px; background: var(--cyan); opacity: .8; animation: eq 1.2s ease-in-out infinite; }
+.hud-tag.t1 { top: 6%; left: 5%; } .hud-tag.t2 { top: 6%; right: 5%; text-align: right; justify-items: end; } .hud-tag.t3 { bottom: 16%; left: 5%; } .hud-tag.t4 { bottom: 16%; right: 5%; text-align: right; justify-items: end; }
+.orb-ctl { position: absolute; left: 0; right: 0; bottom: 3%; z-index: 4; display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.state { font-family: var(--label); font-size: 10.5px; letter-spacing: .26em; color: var(--cyan); padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: rgba(2, 7, 15, .78); transition: color .3s; }
+.state i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 8px; box-shadow: 0 0 8px currentColor; vertical-align: 1px; animation: pulse 1.4s infinite; }
+.speak { padding: 10px 18px; font-size: 10.5px; }
+#wave { display: block; width: min(100%, 520px); height: 46px; margin: 6px auto 0; }
+.subtitle { margin: 8px auto 0; width: min(100%, 520px); text-align: center; font-size: 18px; font-weight: 500; color: var(--fg); min-height: 3.2em; line-height: 1.55; text-shadow: 0 0 16px rgba(79, 216, 255, .5); }
+.subtitle small { display: block; font-family: var(--label); font-size: 9.5px; letter-spacing: .26em; color: var(--muted); margin-bottom: 4px; }
+.hint { text-align: center; font-size: 13.5px; color: var(--muted); }
+
+/* ---------------- faixa rolando */
+.ticker { border-block: 1px solid var(--line2); background: linear-gradient(90deg, rgba(5,19,39,.9), rgba(5,19,39,.5), rgba(5,19,39,.9)); overflow: hidden; padding-block: 15px; }
+.ticker .row { display: flex; gap: 52px; width: max-content; animation: marquee 50s linear infinite; }
+.ticker span { font-family: var(--label); font-size: 11.5px; letter-spacing: .22em; color: var(--muted); white-space: nowrap; }
+.ticker span::before { content: "◆"; color: var(--cyan); margin-right: 16px; font-size: 8px; vertical-align: 2px; }
+
+/* ---------------- seções */
+section { padding-block: 96px; }
+.sec-head { display: grid; gap: 16px; max-width: 780px; margin-bottom: 46px; }
+.sec-head.center { margin-inline: auto; text-align: center; justify-items: center; }
+.sec-head h2 { font-size: clamp(27px, 3.5vw, 42px); line-height: 1.15; }
+.sec-head p { color: var(--muted); font-size: 19px; font-weight: 300; }
+.alt { background: linear-gradient(180deg, transparent, rgba(5, 19, 39, .75) 10%, rgba(5, 19, 39, .75) 90%, transparent); }
+
+/* cartão com borda de energia */
+.edge { position: relative; isolation: isolate; border-radius: var(--r); }
+.edge::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; z-index: -1; pointer-events: none;
+  background: conic-gradient(from var(--a, 0deg), transparent 0 70%, var(--cyan) 85%, var(--ice) 90%, transparent 100%), linear-gradient(var(--line), var(--line));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: rot 6s linear infinite; animation-play-state: paused; opacity: .9; }
+.edge:hover::before { animation-play-state: running; }
+
+/* ---------------- números */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat { padding: 20px; background: rgba(2, 10, 20, .55); border-radius: var(--r); }
+.stat b { display: block; font-family: var(--disp); font-size: clamp(30px, 3.4vw, 42px); color: var(--cyan); font-variant-numeric: tabular-nums; text-shadow: 0 0 18px rgba(79,216,255,.45); }
+.stat span { color: var(--muted); font-size: 15px; }
+
+/* ---------------- painel (mock) */
+.mock-wrap { perspective: 1600px; }
+.mock { transform: rotateX(var(--tilt, 16deg)) scale(var(--sc, .94)); transform-origin: 50% 0; transition: transform .15s linear; border-radius: 18px; overflow: hidden;
+  border: 1px solid var(--line); background: rgba(3, 11, 22, .92); box-shadow: 0 40px 120px rgba(0,0,0,.6), 0 0 80px rgba(79,216,255,.12); }
+.mock-bar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line2); background: rgba(5, 19, 39, .9); }
+.mock-bar i { width: 10px; height: 10px; border-radius: 50%; background: #2a4258; } .mock-bar i:first-child { background: #ff5f57; } .mock-bar i:nth-child(2) { background: #febc2e; } .mock-bar i:nth-child(3) { background: #28c840; }
+.mock-bar span { margin-left: 12px; font-family: var(--label); font-size: 9.5px; letter-spacing: .24em; color: var(--muted); }
+.mock-body { display: grid; grid-template-columns: 56px 1fr 1.25fr 1fr; gap: 12px; padding: 14px; min-height: 420px; }
+.m-side { display: grid; gap: 10px; align-content: start; justify-items: center; padding-top: 4px; }
+.m-side i { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line2); display: grid; place-items: center; font-style: normal; font-size: 15px; opacity: .8; }
+.m-side i.on { border-color: var(--cyan); background: rgba(79,216,255,.1); box-shadow: 0 0 10px rgba(79,216,255,.3); opacity: 1; }
+.m-col { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.m-card { border: 1px solid var(--line2); border-radius: 12px; padding: 12px; background: rgba(8, 26, 48, .5); min-width: 0; }
+.m-card h4 { margin: 0 0 8px; font-family: var(--label); font-size: 9px; letter-spacing: .22em; color: var(--cyan); font-weight: 400; display: flex; justify-content: space-between; }
+.m-card h4 em { font-style: normal; color: var(--green); }
+.m-wx { display: flex; align-items: center; gap: 12px; }
+.m-wx b { font-family: var(--disp); font-size: 34px; color: var(--fg); }
+.m-wx span { color: var(--muted); font-size: 13px; line-height: 1.3; }
+.m-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 5px 0; border-bottom: 1px dashed var(--line2); }
+.m-row:last-child { border-bottom: 0; } .m-row span { color: var(--muted); } .m-row b { font-weight: 600; }
+.m-task { display: flex; gap: 9px; align-items: center; font-size: 13px; padding: 5px 0; }
+.m-task i { width: 13px; height: 13px; border-radius: 4px; border: 1.5px solid var(--cyan); flex: none; }
+.m-task.done i { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); } .m-task.done span { color: var(--muted); text-decoration: line-through; }
+.m-orb { position: relative; height: 230px; border-radius: 12px; border: 1px solid var(--line2); background: radial-gradient(circle at 50% 45%, rgba(79,216,255,.12), transparent 60%); overflow: hidden; }
+.m-orb canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.m-orb span { position: absolute; left: 12px; top: 10px; font-family: var(--disp); font-size: 15px; letter-spacing: .3em; color: var(--cyan); }
+.m-orb small { position: absolute; left: 12px; top: 32px; font-family: var(--label); font-size: 8.5px; letter-spacing: .2em; color: var(--muted); }
+.m-chat { display: grid; gap: 8px; font-size: 13px; }
+.m-chat div { padding: 7px 10px; border-radius: 10px; max-width: 90%; }
+.m-chat .u { justify-self: end; background: rgba(79,216,255,.14); border: 1px solid var(--line); }
+.m-chat .o { background: rgba(2,10,20,.8); border: 1px solid var(--line2); }
+.m-spark { width: 100%; height: 70px; display: block; }
+.m-spark path.l { fill: none; stroke: var(--gold); stroke-width: 2; stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw 3.5s var(--ease) infinite; filter: drop-shadow(0 0 4px var(--gold)); }
+.m-spark path.f { fill: rgba(255,184,77,.12); }
+.m-feed { display: grid; gap: 6px; font-size: 12.5px; max-height: 120px; overflow: hidden; }
+.m-feed div { display: flex; gap: 8px; color: var(--muted); animation: pop .35s ease-out; } .m-feed div::before { content: "●"; color: var(--green); font-size: 9px; margin-top: 3px; }
+.ring-gauges { display: flex; gap: 10px; justify-content: space-around; }
+.gauge { width: 62px; text-align: center; font-size: 10.5px; color: var(--muted); font-family: var(--label); letter-spacing: .12em; }
+.gauge svg { width: 62px; height: 62px; display: block; margin-bottom: 4px; }
+.gauge circle.v { transition: stroke-dashoffset 1.2s var(--ease); }
+
+/* ---------------- recursos principais */
+.feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.feat { background: var(--panel); padding: 24px; display: grid; gap: 12px; align-content: start; overflow: hidden; transition: transform .35s var(--ease), box-shadow .35s; min-width: 0; transform-style: preserve-3d; }
+.feat:hover { box-shadow: 0 20px 60px rgba(0,0,0,.4), 0 0 40px rgba(79, 216, 255, .14); }
+.feat h3 { font-size: 17px; letter-spacing: .05em; }
+.feat p { color: var(--muted); font-size: 16px; }
+.feat .tag { font-family: var(--label); font-size: 9.5px; letter-spacing: .26em; color: var(--gold); }
+.viz { height: 132px; border-radius: 12px; border: 1px solid var(--line2); background: radial-gradient(circle at 50% 50%, rgba(79,216,255,.08), rgba(2, 7, 15, .6) 70%); position: relative; overflow: hidden; display: grid; place-items: center; }
+.viz::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0 46%, rgba(79,216,255,.18) 50%, transparent 54% 100%); background-size: 100% 220%; animation: vscan 3.6s linear infinite; pointer-events: none; }
+.wave { display: flex; gap: 4px; align-items: center; height: 64px; }
+.wave i { width: 5px; border-radius: 3px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: eq 1.1s ease-in-out infinite; }
+.brief { display: grid; gap: 7px; width: 78%; }
+.brief div { height: 11px; border-radius: 4px; background: linear-gradient(90deg, rgba(79,216,255,.55), rgba(79,216,255,.06)); transform-origin: left; animation: bar 4s ease-in-out infinite; }
+.brief div:nth-child(2) { width: 70%; animation-delay: .3s; } .brief div:nth-child(3) { width: 86%; animation-delay: .6s; } .brief div:nth-child(4) { width: 52%; animation-delay: .9s; }
+.brief .big { font-family: var(--disp); color: var(--cyan); font-size: 25px; background: none; height: auto; animation: none; }
+.checks { display: grid; gap: 9px; width: 78%; }
+.checks div { display: flex; gap: 10px; align-items: center; font-size: 13.5px; color: var(--muted); }
+.checks div::before { content: ""; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--cyan); flex: none; animation: tick 4.5s infinite; }
+.checks div:nth-child(2)::before { animation-delay: 1.2s; } .checks div:nth-child(3)::before { animation-delay: 2.4s; }
+.coins { display: flex; gap: 10px; align-items: flex-end; height: 78px; }
+.coins i { width: 18px; border-radius: 4px 4px 0 0; background: linear-gradient(var(--gold), rgba(255,184,77,.15)); animation: grow 3.2s ease-in-out infinite; box-shadow: 0 0 10px rgba(255,184,77,.3); }
+.atom { width: 96px; height: 96px; position: relative; transform-style: preserve-3d; }
+.atom::before { content: ""; position: absolute; inset: 38%; border-radius: 50%; background: radial-gradient(circle, #fff, var(--cyan)); box-shadow: 0 0 18px var(--cyan); }
+.atom i { position: absolute; inset: 0; border: 1.5px solid rgba(79,216,255,.7); border-radius: 50%; animation: orbit 3s linear infinite; }
+.atom i:nth-child(2) { --ry: 60deg; animation-duration: 4s; } .atom i:nth-child(3) { --ry: -60deg; animation-duration: 5s; }
+.atom i::after { content: ""; position: absolute; top: -4px; left: 50%; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+.panels { display: flex; gap: 9px; }
+.panels i { width: 52px; height: 68px; border-radius: 7px; border: 1px solid var(--cyan); background: linear-gradient(160deg, rgba(79,216,255,.28), rgba(79,216,255,.03)); animation: flip 4s ease-in-out infinite; }
+.panels i:nth-child(2) { animation-delay: .4s; } .panels i:nth-child(3) { animation-delay: .8s; }
+
+/* ---------------- lista completa */
+.groups { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.group { padding: 22px 22px 20px; background: rgba(2, 10, 20, .5); min-width: 0; }
+.group h3 { font-size: 12.5px; letter-spacing: .22em; color: var(--cyan); margin-bottom: 16px; display: flex; gap: 12px; align-items: center; }
+.group h3 span { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; border: 1px solid var(--line); background: rgba(79,216,255,.06); }
+.group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.group li { display: grid; grid-template-columns: 14px 1fr; gap: 10px; font-size: 16px; }
+.group li::before { content: ""; width: 6px; height: 6px; margin-top: 9px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+.group li small { display: block; color: var(--muted); font-size: 14px; font-weight: 300; }
+
+/* ---------------- personagens */
+.personas { display: grid; grid-template-columns: 1fr 1.05fr; gap: 34px; align-items: center; }
+.p-list { display: grid; gap: 12px; }
+.p-card { text-align: left; display: grid; grid-template-columns: 54px 1fr auto; gap: 16px; align-items: center; padding: 15px 18px; border-radius: var(--r); cursor: pointer;
+  border: 1px solid var(--line2); background: rgba(2, 10, 20, .55); color: var(--fg); font-family: var(--body); transition: border-color .3s, background .3s, transform .3s var(--ease), box-shadow .3s; width: 100%; }
+.p-card:hover { transform: translateX(6px); }
+.p-card.on { border-color: var(--pc); background: color-mix(in srgb, var(--pc) 10%, rgba(2, 10, 20, .7)); box-shadow: 0 0 30px color-mix(in srgb, var(--pc) 22%, transparent); }
+.p-dot { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--pc); display: grid; place-items: center; font-family: var(--disp); font-weight: 900; color: var(--pc); box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 50%, transparent); }
+.p-card b { font-family: var(--disp); letter-spacing: .16em; font-size: 15px; color: var(--pc); }
+.p-card p { color: var(--muted); font-size: 15px; line-height: 1.4; }
+.p-card em { font-style: normal; font-family: var(--label); font-size: 9px; letter-spacing: .14em; color: var(--muted); border: 1px solid var(--line2); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.p-stage { position: relative; aspect-ratio: 1 / 1; max-width: 100%; }
+.p-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.p-quote { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); width: min(94%, 460px); text-align: center; padding: 12px 16px; border-radius: 12px;
+  background: rgba(2, 7, 15, .82); border: 1px solid var(--line); font-size: 17px; font-weight: 500; transition: border-color .4s; }
+.p-quote small { display: block; font-family: var(--label); font-size: 9px; letter-spacing: .24em; color: var(--muted); margin-bottom: 4px; }
+
+/* ---------------- conversa */
+.demo { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; align-items: start; }
+.chat { background: var(--panel); overflow: hidden; min-width: 0; }
+.chat-top { display: flex; gap: 10px; align-items: center; padding: 13px 18px; border-bottom: 1px solid var(--line2); font-family: var(--label); font-size: 9.5px; letter-spacing: .22em; color: var(--muted); }
+.chat-top i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+.chat-body { padding: 18px; display: grid; gap: 12px; height: 440px; overflow: hidden; align-content: end; }
+.msg { max-width: 86%; padding: 11px 15px; border-radius: 15px; font-size: 16px; line-height: 1.45; animation: pop .35s ease-out; }
+.msg.me { justify-self: end; background: rgba(79, 216, 255, .14); border: 1px solid var(--line); border-bottom-right-radius: 4px; }
+.msg.ai { justify-self: start; background: rgba(2, 7, 15, .85); border: 1px solid var(--line2); border-bottom-left-radius: 4px; }
+.msg.ai b { color: var(--cyan); font-family: var(--label); font-size: 9px; letter-spacing: .22em; display: block; margin-bottom: 4px; font-weight: 400; }
+.tool { justify-self: start; font-family: var(--label); font-size: 9.5px; letter-spacing: .14em; color: var(--gold); border: 1px dashed rgba(255,184,77,.5); border-radius: 999px; padding: 6px 12px; animation: pop .3s ease-out; }
+.dots { justify-self: start; display: flex; gap: 5px; padding: 12px 14px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); animation: bounce 1s infinite; } .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+.say { margin: 0; padding: 0; display: grid; gap: 12px; }
+.say li { list-style: none; padding: 15px 18px; border-left: 2px solid var(--cyan); background: linear-gradient(90deg, rgba(79,216,255,.07), transparent); border-radius: 0 12px 12px 0; font-size: 17px; font-weight: 500; }
+.say li span { display: block; color: var(--muted); font-size: 15px; font-weight: 300; }
+
+/* ---------------- passos */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; counter-reset: s; position: relative; }
+.steps::before { content: ""; position: absolute; left: 6%; right: 6%; top: 46px; height: 1px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); opacity: .5; }
+.step { position: relative; padding: 24px 20px 22px; background: rgba(2, 10, 20, .6); min-width: 0; }
+.step::after { counter-increment: s; content: "0" counter(s); position: absolute; top: -14px; right: 16px; font-family: var(--disp); font-size: 12px; color: var(--ink); background: var(--cyan); border-radius: 999px; padding: 4px 10px; box-shadow: 0 0 14px var(--cyan); }
+.step .ic { font-size: 28px; display: block; margin-bottom: 10px; }
+.step h3 { font-size: 15.5px; letter-spacing: .08em; margin-bottom: 6px; }
+.step p { color: var(--muted); font-size: 15.5px; }
+
+/* ---------------- segurança */
+.shield { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.sh { display: grid; grid-template-columns: 46px 1fr; gap: 14px; align-items: start; padding: 20px; background: rgba(2, 10, 20, .55); min-width: 0; }
+.sh .ic { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font-size: 22px; background: rgba(91, 227, 161, .08); border: 1px solid rgba(91, 227, 161, .4); }
+.sh h3 { font-size: 14.5px; letter-spacing: .05em; margin-bottom: 5px; }
+.sh p { color: var(--muted); font-size: 15.5px; font-weight: 300; }
+
+/* ---------------- preço */
+.price-wrap { display: grid; grid-template-columns: 1.1fr .9fr; gap: 34px; align-items: center; }
+.price { position: relative; padding: 36px 32px; border-radius: 24px; overflow: hidden; isolation: isolate; }
+.price::before { content: ""; position: absolute; inset: -2px; z-index: -2; background: conic-gradient(from var(--a, 0deg), var(--cyan), transparent 25%, var(--gold), transparent 60%, var(--cyan)); animation: rot 6s linear infinite; }
+.price::after { content: ""; position: absolute; inset: 1.5px; z-index: -1; border-radius: 23px; background: radial-gradient(circle at 80% 0%, rgba(79,216,255,.14), transparent 50%), #04162b; }
+.seal { position: absolute; right: 18px; top: 18px; width: 104px; height: 104px; }
+.seal svg { width: 100%; height: 100%; animation: spin 18s linear infinite; }
+.seal b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--disp); font-size: 22px; color: var(--green); line-height: 1; text-align: center; }
+.seal b small { display: block; font-size: 8px; letter-spacing: .2em; color: var(--muted); }
+.price .tag { font-family: var(--label); font-size: 9.5px; letter-spacing: .26em; color: var(--gold); }
+.price h3 { font-size: 28px; margin: 10px 0 4px; letter-spacing: .14em; }
+.amount { display: flex; align-items: baseline; gap: 14px; margin: 16px 0 6px; flex-wrap: wrap; }
+.amount s { color: var(--muted); font-size: 20px; }
+.amount b { font-family: var(--disp); font-size: clamp(46px, 6vw, 64px); color: var(--cyan); font-variant-numeric: tabular-nums; text-shadow: 0 0 26px rgba(79,216,255,.5); }
+.amount small { color: var(--muted); font-size: 15px; }
+.incl { list-style: none; padding: 0; margin: 20px 0 26px; display: grid; gap: 9px; }
+.incl li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 16px; }
+.incl li::before { content: "✓"; color: var(--green); font-weight: 700; text-shadow: 0 0 8px var(--green); }
+.price .btn { width: 100%; padding: 17px; font-size: 13.5px; }
+.fine { font-size: 13.5px; color: var(--muted); margin-top: 12px; font-weight: 300; }
+.req { display: grid; gap: 12px; }
+.req div { display: grid; grid-template-columns: 42px 1fr; gap: 12px; align-items: start; padding: 15px; background: rgba(2, 10, 20, .55); border-radius: 14px; }
+.req div > span:first-child { font-size: 24px; line-height: 1.2; }
+.req b { display: block; font-size: 16px; font-weight: 600; }
+.req p { color: var(--muted); font-size: 14.5px; font-weight: 300; }
+
+/* ---------------- perguntas */
+.faq { display: grid; gap: 10px; max-width: 880px; margin-inline: auto; }
+.faq details { border: 1px solid var(--line2); border-radius: 14px; background: rgba(2, 10, 20, .55); transition: border-color .25s, background .25s; }
+.faq details[open] { border-color: var(--line); background: rgba(8, 26, 48, .55); }
+.faq summary { cursor: pointer; padding: 17px 20px; font-weight: 600; font-size: 17px; list-style: none; display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-family: var(--disp); color: var(--cyan); font-size: 20px; transition: transform .3s var(--ease); flex: none; }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { padding: 0 20px 18px; color: var(--muted); font-size: 16px; font-weight: 300; animation: pop .3s ease-out; }
+
+/* ---------------- final */
+.final { text-align: center; padding-block: 110px; position: relative; overflow: hidden; }
+.final::before { content: ""; position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; max-width: 160vw; margin: -450px 0 0 -450px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(79,216,255,.14), transparent 60%); animation: breathe 6s ease-in-out infinite; }
+.final .rings { position: absolute; left: 50%; top: 50%; pointer-events: none; }
+.final .rings i { position: absolute; border: 1px solid rgba(79,216,255,.18); border-radius: 50%; animation: ripple 6s linear infinite; }
+.final h2 { font-size: clamp(30px, 4.6vw, 54px); margin: 16px auto 18px; max-width: 17em; position: relative; }
+.final p { color: var(--muted); font-size: 19px; max-width: 34em; margin: 0 auto 28px; position: relative; font-weight: 300; }
+.final .cta { justify-content: center; position: relative; }
+
+footer { border-top: 1px solid var(--line2); padding-block: 34px; color: var(--muted); font-size: 14px; background: rgba(2, 7, 15, .8); }
+footer .wrap { display: grid; gap: 12px; }
+.f-row { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; align-items: center; }
+
+/* entrada ao rolar: começa visível; ao aparecer ganha um "pulso" holográfico */
+.rv.in { animation: rise .8s var(--ease) both; }
+.rv.in:nth-child(2) { animation-delay: .08s; } .rv.in:nth-child(3) { animation-delay: .16s; } .rv.in:nth-child(4) { animation-delay: .24s; }
+.rv.in:nth-child(5) { animation-delay: .32s; } .rv.in:nth-child(6) { animation-delay: .4s; }
+
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.85); } }
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shine { 0%, 60% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@keyframes shimmer { to { background-position: -250% 0; } }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes eq { 0%, 100% { height: 15%; } 50% { height: 100%; } }
+@keyframes bar { 0%, 100% { transform: scaleX(.35); } 50% { transform: scaleX(1); } }
+@keyframes tick { 0%, 20% { background: transparent; } 30%, 100% { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); } }
+@keyframes grow { 0%, 100% { height: 20%; } 50% { height: 100%; } }
+@keyframes orbit { from { transform: rotateX(72deg) rotateY(var(--ry, 0deg)) rotateZ(0); } to { transform: rotateX(72deg) rotateY(var(--ry, 0deg)) rotateZ(360deg); } }
+@keyframes flip { 0%, 100% { transform: perspective(300px) rotateY(0); } 50% { transform: perspective(300px) rotateY(180deg); } }
+@keyframes pop { from { transform: translateY(8px) scale(.97); } to { transform: none; } }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+@keyframes rise { from { transform: translateY(22px); filter: brightness(2) drop-shadow(0 0 14px rgba(79,216,255,.6)); } to { transform: none; filter: none; } }
+@keyframes sweep { to { top: 110%; } }
+@keyframes vscan { from { background-position: 0 -120%; } to { background-position: 0 120%; } }
+@keyframes draw { 0% { stroke-dashoffset: 400; } 55%, 100% { stroke-dashoffset: 0; } }
+@keyframes breathe { 0%, 100% { transform: scale(.9); opacity: .7; } 50% { transform: scale(1.08); opacity: 1; } }
+@keyframes ripple { from { width: 0; height: 0; margin: 0; opacity: 1; } to { width: 1100px; height: 1100px; margin: -550px 0 0 -550px; opacity: 0; } }
+/* ================= MODO HUD DO CAPACETE ================= */
+.hud-btn { display: inline-flex; align-items: center; gap: 10px; background: rgba(79,216,255,.05); border: 1px solid var(--line); color: var(--muted); border-radius: 999px; padding: 5px 12px 5px 6px;
+  font-family: var(--label); font-size: 9.5px; letter-spacing: .18em; cursor: pointer; transition: color .3s, border-color .3s, box-shadow .3s; }
+.hud-btn .sw { width: 34px; height: 18px; border-radius: 999px; border: 1px solid var(--line); position: relative; background: rgba(2,7,15,.8); transition: background .3s, border-color .3s; }
+.hud-btn .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform .35s var(--ease), background .3s, box-shadow .3s; }
+.hud-btn svg { width: 16px; height: 16px; }
+.hud-btn.on { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 18px rgba(79,216,255,.35); }
+.hud-btn.on .sw { background: rgba(79,216,255,.25); border-color: var(--cyan); }
+.hud-btn.on .sw::after { transform: translateX(16px); background: var(--ice); box-shadow: 0 0 10px var(--cyan); }
+.hud-fab { position: fixed; right: max(16px, calc(env(safe-area-inset-right, 0px) + 16px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); z-index: 85; padding: 8px 14px 8px 8px; background: rgba(2,7,15,.85); backdrop-filter: blur(8px); }
+.hud-fab b { font-weight: 400; }
+
+#hud { position: fixed; inset: 0; z-index: 70; pointer-events: none; visibility: hidden; font-family: var(--label); color: var(--cyan); }
+#hud.on { visibility: visible; }
+#hud .vig { position: absolute; inset: 0; opacity: 0; transition: opacity .8s;
+  background: radial-gradient(ellipse 78% 70% at 50% 50%, transparent 58%, rgba(0, 18, 32, .55) 80%, rgba(0, 6, 12, .92) 100%); }
+#hud .tint { position: absolute; inset: 0; opacity: 0; transition: opacity .8s; background: linear-gradient(180deg, rgba(79,216,255,.06), transparent 30%, transparent 70%, rgba(79,216,255,.06)); mix-blend-mode: screen; }
+#hud .lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+#hud .lines path { fill: none; stroke: var(--cyan); stroke-width: 1.5; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 4px rgba(79,216,255,.8));
+  stroke-dasharray: 3000; stroke-dashoffset: 3000; transition: stroke-dashoffset 1.3s var(--ease); }
+#hud .lines path.thin { stroke-width: .8; opacity: .5; }
+/* abas que "fecham" como a viseira */
+#hud .lid { position: absolute; left: 0; right: 0; height: 50%; background: linear-gradient(var(--bg), #041528); z-index: 5; transform: scaleY(0); }
+#hud .lid.t { top: 0; transform-origin: top; border-bottom: 2px solid var(--cyan); box-shadow: 0 0 30px var(--cyan); }
+#hud .lid.b { bottom: 0; transform-origin: bottom; border-top: 2px solid var(--cyan); box-shadow: 0 0 30px var(--cyan); }
+#hud.closing .lid { animation: lidClose .42s cubic-bezier(.7, 0, .3, 1) forwards; }
+#hud.opening .lid { animation: lidOpen .55s cubic-bezier(.7, 0, .3, 1) forwards; }
+#hud .flash { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; text-align: center; opacity: 0; letter-spacing: .5em; font-size: 13px; white-space: nowrap; }
+#hud .flash b { display: block; font-family: var(--disp); font-size: clamp(22px, 4vw, 38px); letter-spacing: .3em; margin-top: 8px; text-shadow: 0 0 20px var(--cyan); font-weight: 700; }
+#hud.closing .flash, #hud.opening .flash { animation: flash 1s ease forwards; }
+/* blocos do HUD */
+#hud .blk { position: absolute; opacity: 0; transform: var(--from); transition: opacity .6s var(--ease), transform .7s var(--ease); }
+#hud.live .blk { opacity: 1; transform: none; }
+#hud.live .vig, #hud.live .tint { opacity: 1; }
+#hud.live .lines path { stroke-dashoffset: 0; }
+#hud .sys, #hud .lock, #hud .clockbox, #hud .target { background: rgba(2, 10, 20, .74); border: 1px solid var(--line); padding: 10px 14px; backdrop-filter: blur(6px);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); box-shadow: inset 0 0 20px rgba(79,216,255,.08); }
+#hud .lbl { font-size: 9px; letter-spacing: .26em; color: var(--muted); }
+#hud .val { font-family: var(--disp); font-size: 15px; letter-spacing: .12em; text-shadow: 0 0 10px rgba(79,216,255,.7); }
+.compass { top: calc(env(safe-area-inset-top, 0px) + 74px); left: 50%; width: min(560px, 70vw); margin-left: max(-280px, -35vw); height: 40px; overflow: hidden; --from: translateY(-30px);
+  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent); }
+.compass .tape { position: absolute; top: 4px; left: 0; height: 30px; white-space: nowrap; display: flex; will-change: transform; }
+.compass .tape span { width: 40px; flex: none; text-align: center; font-size: 9.5px; position: relative; padding-top: 14px; color: var(--muted); }
+.compass .tape span::before { content: ""; position: absolute; top: 0; left: 50%; width: 1px; height: 10px; background: var(--cyan); opacity: .7; }
+.compass .tape span.c { color: var(--cyan); } .compass .tape span.c::before { height: 13px; opacity: 1; }
+.compass .mark { position: absolute; left: 50%; top: 0; width: 0; height: 0; margin-left: -6px; border: 6px solid transparent; border-top-color: var(--gold); filter: drop-shadow(0 0 6px var(--gold)); }
+.compass .hdg { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); font-size: 10px; color: var(--gold); letter-spacing: .2em; }
+.alt-scale { left: max(22px, env(safe-area-inset-left, 0px) + 22px); top: 26%; bottom: 26%; width: 58px; --from: translateX(-30px); }
+.alt-scale .rail { position: absolute; left: 0; top: 0; bottom: 0; width: 12px; border-left: 1px solid var(--cyan);
+  background: repeating-linear-gradient(180deg, var(--cyan) 0 1px, transparent 1px 10%); background-size: 100% 10%; opacity: .7; }
+.alt-scale .ptr { position: absolute; left: 14px; transform: translateY(-50%); font-size: 10px; display: flex; gap: 6px; align-items: center; transition: top .15s linear; white-space: nowrap; }
+.alt-scale .ptr::before { content: ""; border: 5px solid transparent; border-right-color: var(--gold); margin-left: -10px; filter: drop-shadow(0 0 5px var(--gold)); }
+.alt-scale .ptr b { font-family: var(--disp); color: var(--fg); font-weight: 400; }
+.alt-scale .cap { position: absolute; top: -26px; left: 0; background: rgba(2, 10, 20, .74); padding: 3px 6px; border: 1px solid var(--line2); }
+.sys { right: max(22px, env(safe-area-inset-right, 0px) + 22px); top: 30%; width: 190px; display: grid; gap: 10px; --from: translateX(30px); }
+.sys .row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; font-size: 9.5px; letter-spacing: .16em; }
+.sys .row i { grid-column: 1 / -1; height: 3px; background: rgba(79,216,255,.15); border-radius: 2px; overflow: hidden; }
+.sys .row i::after { content: ""; display: block; height: 100%; width: var(--w, 50%); background: linear-gradient(90deg, var(--cyan), var(--ice)); box-shadow: 0 0 8px var(--cyan); transition: width .6s var(--ease); }
+.sys .row em { font-style: normal; color: var(--green); }
+.clockbox { right: max(22px, env(safe-area-inset-right, 0px) + 22px); bottom: 15%; text-align: right; --from: translateX(30px); }
+.clockbox .val { font-size: 22px; }
+.target { left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); transform: translateX(-50%); --from: translate(-50%, 30px); text-align: center; min-width: 260px; }
+#hud.live .target { transform: translateX(-50%); }
+.target .val { font-size: 13px; letter-spacing: .3em; }
+.target .bar { margin: 6px auto 0; height: 2px; width: 220px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); animation: scanbar 2.4s ease-in-out infinite; }
+.lock { left: max(22px, env(safe-area-inset-left, 0px) + 22px); bottom: 15%; --from: translateX(-30px); }
+.lock .val { color: var(--green); text-shadow: 0 0 10px rgba(91,227,161,.7); }
+/* mira que segue o cursor */
+#hud .reticle { position: absolute; left: 0; top: 0; width: 84px; height: 84px; margin: -42px 0 0 -42px; opacity: 0; transition: opacity .4s; will-change: transform; }
+#hud.live .reticle.show { opacity: 1; }
+.reticle svg { width: 100%; height: 100%; overflow: visible; }
+.reticle .r1 { transform-origin: 42px 42px; animation: spin 6s linear infinite; }
+.reticle .r2 { transform-origin: 42px 42px; animation: spin 3s linear infinite reverse; }
+.reticle .tag { position: absolute; left: 92px; top: 6px; font-size: 9px; letter-spacing: .2em; white-space: nowrap; color: var(--cyan); }
+.reticle .tag b { display: block; color: var(--fg); font-weight: 400; }
+.reticle.hot svg { filter: drop-shadow(0 0 6px var(--gold)); } .reticle.hot .r1 circle, .reticle.hot path { stroke: var(--gold); }
+@keyframes lidClose { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes lidOpen { from { transform: scaleY(1); } to { transform: scaleY(0); } }
+@keyframes flash { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes scanbar { 0%, 100% { transform: scaleX(.3); opacity: .5; } 50% { transform: scaleX(1); opacity: 1; } }
+@media (max-width: 760px) {
+  .alt-scale, .sys, .lock { display: none; }
+  .clockbox { right: 16px; bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 122px); padding: 6px 10px !important; }
+  .clockbox .val { font-size: 14px; }
+  .target { min-width: 0; width: calc(100% - 32px); bottom: calc(env(safe-area-inset-bottom, 0px) + 74px); padding: 8px 12px !important; }
+  .target .val { font-size: 11px; }
+  .target .bar { width: 100%; }
+  .hud-btn .lab { display: none; }
+}
+@media (max-width: 1280px) { .top .hud-btn .lab { display: none; } .top .hud-btn { padding-right: 6px; } }
+@media (prefers-reduced-motion: reduce) { #hud .lid { display: none; } }
+
+@property --a { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes rot { to { --a: 360deg; } }
+
+@media (max-width: 1180px) { .menu { gap: 18px; } .menu a { font-size: 12.5px; letter-spacing: .08em; } }
+@media (max-width: 1100px) { .menu { display: none; } .top .sound { margin-left: auto; } }
+@media (max-width: 1020px) {
+  .hero .wrap, .personas, .demo, .price-wrap { grid-template-columns: 1fr; }
+  .hero .wrap > div:last-child { order: -1; }
+  .orb-box { max-width: 480px; }
+  .feat-grid, .groups, .shield { grid-template-columns: repeat(2, 1fr); }
+  .steps { grid-template-columns: repeat(2, 1fr); row-gap: 30px; } .steps::before { display: none; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .menu { display: none; }
+  .top .sound { margin-left: auto; }
+  .mock-body { grid-template-columns: 46px 1fr 1fr; }
+  .mock-body .m-col:last-child { display: none; }
+}
+@media (max-width: 640px) {
+  body { font-size: 16.5px; }
+  .feat-grid, .groups, .shield, .steps { grid-template-columns: 1fr; }
+  section { padding-block: 66px; }
+  .hero { padding-block: 18px 16px; }
+  .p-card { grid-template-columns: 46px 1fr; } .p-card em { grid-column: 2; justify-self: start; } .p-dot { width: 46px; height: 46px; }
+  .chat-body { height: 400px; }
+  .hud-tag { display: none; }
+  .brand b { font-size: 15px; letter-spacing: .32em; }
+  .top .btn { display: none; }
+  .mock { transform: none !important; }
+  .mock-body { grid-template-columns: 1fr; min-height: 0; }
+  .m-side { display: none; }
+  .seal { width: 84px; height: 84px; right: 12px; top: 12px; }
+  .price { padding: 30px 20px; }
+  .price h3, .price .tag { padding-right: 90px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  #boot { display: none; }
+}
+
+/* os anéis decorativos da abertura não podem empurrar a página para o lado no celular */
+.hero { overflow-x: clip; }
+/* ---------------- planos e gastos adicionais */
+.plans { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: stretch; }
+.plans .price { display: flex; flex-direction: column; }
+.plans .price .btn { margin-top: auto; }
+.plans .incl { flex: 1; }
+.plan-sub { color: var(--muted); font-weight: 300; font-size: 15.5px; padding-right: 96px; }
+.plans .price h3, .plans .price .tag { padding-right: 112px; }
+.price.plus::after { background: radial-gradient(circle at 80% 0%, rgba(255,184,77,.16), transparent 55%), #04162b; }
+.price.plus .amount b { color: var(--gold); text-shadow: 0 0 26px rgba(255,184,77,.45); }
+.plans-note { text-align: center; color: var(--muted); margin-top: 26px; font-size: 15.5px; }
+.plans-note a { color: var(--cyan); }
+.costs-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 22px; }
+.cost { padding: 26px 26px 22px; background: rgba(2, 10, 20, .55); }
+.cost h3 { font-size: 19px; margin: 10px 0 8px; letter-spacing: .02em; }
+.cost p { color: var(--muted); font-weight: 300; font-size: 15.5px; }
+.cost ul { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 7px; font-size: 15px; }
+.cost.must { box-shadow: 0 0 0 1px rgba(255,184,77,.45), 0 0 40px rgba(255,184,77,.08); }
+.ct { display: inline-block; font-family: var(--label); font-size: 9.5px; letter-spacing: .24em; padding: 6px 12px; border-radius: 20px; color: #04162b; background: var(--gold); }
+.ct.opt { background: var(--green); }
+.est { margin-top: 22px; padding: 26px; background: rgba(2, 10, 20, .55); }
+.est h3 { font-size: 19px; margin-bottom: 16px; } .est h3 small { color: var(--muted); font-weight: 300; font-size: 14px; }
+.est-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.est-grid div { padding: 16px; border-radius: 14px; border: 1px solid var(--line); background: rgba(8, 26, 48, .5); display: grid; gap: 6px; }
+.est-grid > div > b { font-family: var(--disp); font-size: 26px; color: var(--cyan); }
+.est-grid span b { color: var(--fg); font-weight: 600; }
+.est-grid span { color: var(--muted); font-size: 14px; font-weight: 300; }
+.sum { margin: 22px 0; padding: 18px 22px; border-radius: 14px; border-left: 4px solid var(--cyan); background: rgba(79, 216, 255, .08); font-size: 16.5px; }
+.req-row { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1020px) {
+  .plans, .costs-grid { grid-template-columns: 1fr; }
+  .est-grid, .req-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 640px) {
+  .est-grid, .req-row { grid-template-columns: 1fr; }
+  .plan-sub { padding-right: 0; margin-top: 4px; }
+  .plans .price h3, .plans .price .tag { padding-right: 92px; }
+  .plans .btn { white-space: normal; letter-spacing: .1em; line-height: 1.35; padding: 15px 14px; }
+  .price h3 { font-size: 22px; }
+}
+</style>
+<style>[hidden]{display:none!important} img{max-width:100%} body{margin:0} :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+
+
+<canvas id="net" aria-hidden="true"></canvas>
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="scan" aria-hidden="true"></div>
+<div class="sweep" aria-hidden="true"></div>
+<div id="glow" aria-hidden="true"></div>
+<div id="progress" aria-hidden="true"></div>
+
+<!-- ================= HUD DO CAPACETE (liga/desliga) ================= -->
+<div id="hud" aria-hidden="true">
+  <div class="vig"></div><div class="tint"></div>
+  <svg class="lines" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+    <path d="M60 210 L60 120 Q60 70 110 60 L330 40 L380 70 L620 70 L670 40 L890 60 Q940 70 940 120 L940 210"/>
+    <path d="M60 790 L60 870 Q60 930 120 940 L360 960 L400 935 L600 935 L640 960 L880 940 Q940 930 940 870 L940 790"/>
+    <path class="thin" d="M20 380 L20 620 M980 380 L980 620"/>
+    <path class="thin" d="M300 500 L340 500 M660 500 L700 500 M500 300 L500 330 M500 670 L500 700"/>
+  </svg>
+  <div class="blk compass"><div class="tape" id="hud-tape"></div><span class="mark"></span><span class="hdg" id="hud-hdg">000°</span></div>
+  <div class="blk alt-scale"><span class="lbl cap">PROFUNDIDADE</span><div class="rail"></div><div class="ptr" id="hud-ptr"><b id="hud-pct">0%</b></div></div>
+  <div class="blk sys">
+    <span class="lbl">SISTEMAS</span>
+    <div class="row"><span>NÚCLEO DE IA</span><em>ON</em><i style="--w:92%"></i></div>
+    <div class="row"><span>VOZ</span><em id="hud-v">00%</em><i id="hud-vbar" style="--w:8%"></i></div>
+    <div class="row"><span>REDE</span><em id="hud-net">— ms</em><i style="--w:76%"></i></div>
+    <div class="row"><span>ENERGIA</span><em>98%</em><i style="--w:98%"></i></div>
+  </div>
+  <div class="blk lock"><span class="lbl">VISOR</span><div class="val">TRAVADO</div></div>
+  <div class="blk clockbox"><span class="lbl" id="hud-date">—</span><div class="val" id="hud-clock">00:00:00</div></div>
+  <div class="blk target"><span class="lbl">ALVO ATUAL</span><div class="val" id="hud-target">INÍCIO</div><div class="bar"></div></div>
+  <div class="reticle" id="hud-ret">
+    <svg viewBox="0 0 84 84"><g class="r1"><circle cx="42" cy="42" r="34" fill="none" stroke="#4fd8ff" stroke-width="1.2" stroke-dasharray="14 8"/></g>
+      <g class="r2"><circle cx="42" cy="42" r="24" fill="none" stroke="#4fd8ff" stroke-opacity=".6" stroke-width="1" stroke-dasharray="4 6"/></g>
+      <path d="M42 2 V16 M42 68 V82 M2 42 H16 M68 42 H82" stroke="#4fd8ff" stroke-width="1.5"/><circle cx="42" cy="42" r="2.5" fill="#ffb84d"/></svg>
+    <span class="tag">ALVO<b id="hud-xy">0 · 0</b></span>
+  </div>
+  <div class="lid t"></div><div class="lid b"></div>
+  <div class="flash" id="hud-flash">ACOPLANDO VISOR<b>HUD ONLINE</b></div>
+</div>
+<button class="hud-btn hud-fab" type="button" data-hud aria-pressed="false" title="Ligar ou desligar o HUD do capacete">
+  <span class="sw"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 11c0-5 3.6-8 8-8s8 3 8 8v4c0 3-2 5-5 5H9c-3 0-5-2-5-5z"/><path d="M6.5 11.5h11l-1.2 3H7.7z"/></svg><b>HUD</b>
+</button>
+
+<div id="boot" role="presentation">
+  <div class="boot-in">
+    <div class="boot-ring"><i></i></div>
+    <div class="boot-name">ORION</div>
+    <div class="boot-bar"><i id="boot-bar"></i></div>
+    <div class="boot-log" id="boot-log"></div>
+    <div class="boot-skip">toque para pular</div>
+  </div>
+</div>
+
+<header class="top" id="top">
+  <div class="wrap">
+    <a class="brand" href="#inicio" aria-label="ORION, início"><span class="logo"><span></span></span><b>ORION</b></a>
+    <nav class="menu" aria-label="Seções">
+      <a href="#painel">Painel</a><a href="#recursos">Recursos</a><a href="#personagens">Personagens</a><a href="#seguranca">Segurança</a><a href="#preco">Preço</a><a href="#gastos">Custos</a><a href="#faq">Dúvidas</a>
+    </nav>
+    <button class="sound" id="sound" type="button" aria-pressed="false" title="Sons do painel"><i><b></b><b></b><b></b></i><span>SOM</span></button>
+    <button class="hud-btn" type="button" data-hud aria-pressed="false" title="Ligar ou desligar o HUD do capacete"><span class="sw"></span><span class="lab">MODO HUD</span></button>
+    <a class="btn pri mag" href="#preco" data-buy>Quero o ORION</a>
+  </div>
+</header>
+
+<main id="inicio">
+  <!-- ================= HERO ================= -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow rv">Assistente pessoal com inteligência artificial</span>
+        <h1 class="rv">Seu próprio <span class="accent">centro de comando</span>, com uma inteligência que <span class="shine">conversa com você.</span></h1>
+        <p class="lead rv">O ORION fala, ouve e age no seu computador. <b>Organiza o seu dia</b>, lembra das suas tarefas, controla gastos e treinos, mostra <b>hologramas 3D</b> e explica tudo em voz alta.</p>
+        <div class="term rv" aria-live="polite"><span id="typed"></span></div>
+        <div class="cta rv">
+          <a class="btn pri mag" href="#preco" data-buy>Garantir o meu ORION</a>
+          <a class="btn ghost mag" href="#painel">Ver o painel</a>
+        </div>
+        <div class="trust rv"><span>Pagamento único</span><span>7 dias de garantia</span><span>Atualizações incluídas</span><span>Suporte em português</span></div>
+      </div>
+      <div>
+        <div class="orb-box" id="hero-orb">
+          <svg class="dial" viewBox="0 0 100 100" aria-hidden="true">
+            <defs><linearGradient id="gd" x1="0" x2="1"><stop offset="0" stop-color="#4fd8ff" stop-opacity="0"/><stop offset="1" stop-color="#4fd8ff"/></linearGradient></defs>
+            <g class="spin"><g id="ticks"></g></g>
+            <g class="spin2"><circle cx="50" cy="50" r="44" fill="none" stroke="#4fd8ff" stroke-opacity=".55" stroke-width=".35" stroke-dasharray="18 9 3 9"/></g>
+            <g class="spin3"><path d="M50 9 A41 41 0 0 1 89.5 41" fill="none" stroke="url(#gd)" stroke-width=".8" stroke-linecap="round"/></g>
+            <circle cx="50" cy="50" r="47.5" fill="none" stroke="#4fd8ff" stroke-opacity=".18" stroke-width=".25"/>
+          </svg>
+          <div class="radar" aria-hidden="true"></div>
+          <span class="corner a"></span><span class="corner b"></span><span class="corner c"></span><span class="corner d"></span>
+          <canvas id="orb" aria-label="Esfera de voz do ORION. Arraste para girar."></canvas>
+          <span class="hud-tag t1">NÚCLEO<b>ORION · ONLINE</b><span class="bars"><i></i><i style="animation-delay:.2s"></i><i style="animation-delay:.4s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.3s"></i></span></span>
+          <span class="hud-tag t2">NÍVEL DE VOZ<b id="hud-level">00%</b></span>
+          <span class="hud-tag t3">ROTAÇÃO<b>360° LIVRE</b></span>
+          <span class="hud-tag t4">LATÊNCIA<b id="hud-ms">— ms</b></span>
+          <div class="orb-ctl">
+            <span class="state" id="state"><i></i>EM ESPERA</span>
+            <button class="btn pri speak" id="speak" type="button">▶ Ouvir o ORION</button>
+          </div>
+        </div>
+        <canvas id="wave" aria-hidden="true"></canvas>
+        <p class="subtitle" id="subtitle" aria-live="polite"><small>LEGENDA</small>Toque em “Ouvir o ORION” para ele se apresentar.</p>
+        <p class="hint">Arraste a esfera para girar em qualquer direção.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="ticker" aria-hidden="true"><div class="row" id="ticker"></div></div>
+
+  <!-- ================= NÚMEROS ================= -->
+  <section style="padding-block:56px">
+    <div class="wrap stats">
+      <div class="stat edge rv"><b data-count="4">4</b><span>personagens de IA, cada um com seu jeito</span></div>
+      <div class="stat edge rv"><b data-count="30" data-plus>30+</b><span>ferramentas que ele usa sozinho</span></div>
+      <div class="stat edge rv"><b data-count="5570" data-plus>5.570+</b><span>cidades com clima e previsão</span></div>
+      <div class="stat edge rv"><b data-count="256">256</b><span>bits de criptografia no backup</span></div>
+    </div>
+  </section>
+
+  <!-- ================= PAINEL (mock) ================= -->
+  <section id="painel" class="alt">
+    <div class="wrap">
+      <div class="sec-head center rv">
+        <span class="eyebrow">O painel</span>
+        <h2>Tudo o que importa, <span class="accent">em uma tela</span></h2>
+        <p>Clima, tarefas, gastos, atividade e a esfera de voz no centro. Os números vêm do que você faz no dia a dia.</p>
+      </div>
+      <div class="mock-wrap">
+        <div class="mock" id="mock" aria-label="Exemplo ilustrativo do painel do ORION">
+          <div class="mock-bar"><i></i><i></i><i></i><span>ORION · COMMAND CENTER · EXEMPLO</span></div>
+          <div class="mock-body">
+            <div class="m-side" aria-hidden="true"><i class="on">⌂</i><i>💬</i><i>✅</i><i>🎧</i><i>💰</i><i>🏋️</i><i>🧠</i><i>⚙️</i></div>
+            <div class="m-col">
+              <div class="m-card"><h4>CLIMA <em>AO VIVO</em></h4><div class="m-wx"><b>24°</b><span>Sol entre nuvens<br>Máx 29° · mín 18°</span></div></div>
+              <div class="m-card"><h4>TAREFAS <em id="m-done">1/4</em></h4><div id="m-tasks">
+                <div class="m-task done"><i></i><span>Beber água</span></div><div class="m-task"><i></i><span>Pagar a conta de luz · 18:30</span></div>
+                <div class="m-task"><i></i><span>Treino · 19:00</span></div><div class="m-task"><i></i><span>Ligar para o dentista</span></div></div></div>
+              <div class="m-card"><h4>SISTEMA</h4><div class="ring-gauges" id="gauges"></div></div>
+            </div>
+            <div class="m-col">
+              <div class="m-orb"><canvas id="orb3"></canvas><span>ORION</span><small>AI CORE · OUVINDO</small></div>
+              <div class="m-card"><h4>CONVERSA</h4><div class="m-chat"><div class="u">Quanto gastei com mercado?</div><div class="o">R$ 412 este mês, 8% a menos que o mês passado.</div></div></div>
+            </div>
+            <div class="m-col">
+              <div class="m-card"><h4>GASTOS DO MÊS <em>−8%</em></h4>
+                <svg class="m-spark" viewBox="0 0 200 70" preserveAspectRatio="none" aria-hidden="true"><path class="f" d="M0 55 L25 48 L50 52 L75 35 L100 40 L125 26 L150 30 L175 18 L200 22 L200 70 L0 70Z"/><path class="l" d="M0 55 L25 48 L50 52 L75 35 L100 40 L125 26 L150 30 L175 18 L200 22"/></svg>
+                <div class="m-row"><span>Mercado</span><b>R$ 412</b></div><div class="m-row"><span>Transporte</span><b>R$ 268</b></div><div class="m-row"><span>Lazer</span><b>R$ 140</b></div></div>
+              <div class="m-card"><h4>ATIVIDADE <em>AO VIVO</em></h4><div class="m-feed" id="m-feed"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:18px">Imagem ilustrativa com dados de exemplo.</p>
+    </div>
+  </section>
+
+  <!-- ================= PRINCIPAIS ================= -->
+  <section id="recursos">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="eyebrow">Principais recursos</span>
+        <h2>O que o ORION faz por você <span class="shine">todos os dias</span></h2>
+        <p>Você conversa como se fosse com uma pessoa. Ele entende, executa e responde em voz alta, com o painel mostrando tudo em tempo real.</p>
+      </div>
+      <div class="feat-grid">
+        <article class="feat edge rv tilt"><div class="viz"><div class="wave" aria-hidden="true"></div></div><span class="tag">VOZ</span><h3>Conversa por voz</h3>
+          <p>Diga “Orion…” e fale normalmente. Ele responde com voz natural, entende o contexto e lembra do que vocês conversaram.</p></article>
+        <article class="feat edge rv tilt"><div class="viz"><div class="brief" aria-hidden="true"><div class="big">27° · Ensolarado</div><div></div><div></div><div></div></div></div><span class="tag">TODA MANHÃ</span><h3>Briefing do dia</h3>
+          <p>Duas palmas e ele apresenta o seu dia: clima da sua cidade, lembretes, notícias, esporte, câmbio e uma frase para começar bem.</p></article>
+        <article class="feat edge rv tilt"><div class="viz"><div class="checks" aria-hidden="true"><div>Pagar a conta de luz · 18:30</div><div>Beber água · a cada 2 h</div><div>Treino · 19:00</div></div></div><span class="tag">ORGANIZAÇÃO</span><h3>Tarefas e lembretes</h3>
+          <p>“Me lembra de pagar a luz às 18h30.” Pronto. Lembretes únicos ou diários, com aviso falado na hora certa.</p></article>
+        <article class="feat edge rv tilt"><div class="viz"><div class="coins" aria-hidden="true"><i style="animation-delay:0s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.6s"></i><i style="animation-delay:.9s"></i><i style="animation-delay:1.2s"></i><i style="animation-delay:1.5s"></i></div></div><span class="tag">DINHEIRO</span><h3>Controle financeiro</h3>
+          <p>“Gastei 50 reais no mercado.” Ele anota, separa por categoria, acompanha cartões e faturas e mostra onde dá para economizar.</p></article>
+        <article class="feat edge rv tilt"><div class="viz"><div class="atom" aria-hidden="true"><i></i><i></i><i></i></div></div><span class="tag">3D</span><h3>Hologramas que se montam</h3>
+          <p>Átomos, moléculas, um motor V8 funcionando ou seus próprios modelos 3D. As peças se montam e você clica em cada uma para entender.</p></article>
+        <article class="feat edge rv tilt"><div class="viz"><div class="panels" aria-hidden="true"><i></i><i></i><i></i></div></div><span class="tag">EXPLICAÇÕES</span><h3>Modo visual</h3>
+          <p>Peça para ele explicar algo e as respostas viram painéis animados com imagens, gráficos e narração, um por vez.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TUDO ================= -->
+  <section id="tudo" class="alt">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="eyebrow">Tudo o que ele consegue fazer</span>
+        <h2>Um assistente completo, <span class="accent">em um só programa</span></h2>
+        <p>Cada módulo foi pensado para o dia a dia de verdade, e todos conversam entre si.</p>
+      </div>
+      <div class="groups">
+        <div class="group edge rv"><h3><span>🎙️</span>VOZ E PRESENÇA</h3><ul>
+          <li><div>Palavra de ativação “Orion”<small>ou o modo “sempre ouvindo”</small></div></li>
+          <li><div>Despertador por palmas e voz<small>“ligar o sistema” abre o ORION</small></div></li>
+          <li><div>Reconhece a sua voz<small>pode obedecer só a você</small></div></li>
+          <li><div>Voz neural realista<small>opcional, com várias vozes</small></div></li>
+          <li><div>Esfera viva que reage à fala<small>e gira em 360° com o mouse</small></div></li></ul></div>
+        <div class="group edge rv"><h3><span>🗓️</span>ORGANIZAÇÃO</h3><ul>
+          <li><div>Tarefas e lembretes com hora</div></li>
+          <li><div>Rotina diária<small>água, remédio, treino</small></div></li>
+          <li><div>Memória de longo prazo<small>as mais importantes orbitam a esfera</small></div></li>
+          <li><div>Briefing do dia com música<small>do seu próprio MP3</small></div></li>
+          <li><div>Notícias explicadas em voz alta<small>clique em “saber mais”</small></div></li></ul></div>
+        <div class="group edge rv"><h3><span>💰</span>DINHEIRO E SAÚDE</h3><ul>
+          <li><div>Gastos por categoria e mês</div></li>
+          <li><div>Cartões, faturas e “a receber”<small>quem te deve e quanto</small></div></li>
+          <li><div>Treino com boneco 3D animado</div></li>
+          <li><div>Água, comida e peso<small>tabela brasileira de alimentos</small></div></li>
+          <li><div>Relatórios da semana e do mês</div></li></ul></div>
+        <div class="group edge rv"><h3><span>🧊</span>VISUAL E 3D</h3><ul>
+          <li><div>Hologramas de átomos e moléculas</div></li>
+          <li><div>Motor V8 animado peça por peça</div></li>
+          <li><div>Seus modelos 3D (.glb)<small>com cores reais</small></div></li>
+          <li><div>HUD de capacete<small>dados ao vivo na borda da tela</small></div></li>
+          <li><div>Modo visual com painéis animados</div></li></ul></div>
+        <div class="group edge rv"><h3><span>🖥️</span>NO SEU COMPUTADOR</h3><ul>
+          <li><div>Abre pastas, arquivos e sites</div></li>
+          <li><div>Procura arquivos pelo nome</div></li>
+          <li><div>Vê a tela que você compartilhar<small>e ajuda passo a passo</small></div></li>
+          <li><div>Print e gravação de tela</div></li>
+          <li><div>Controle por gestos<small>sua mão vira o mouse</small></div></li>
+          <li><div>Player das suas músicas e playlists</div></li></ul></div>
+        <div class="group edge rv"><h3><span>🛡️</span>SEGURANÇA</h3><ul>
+          <li><div>Login com senha a cada abertura</div></li>
+          <li><div>Código de recuperação</div></li>
+          <li><div>Pede aprovação antes de agir<small>programas e arquivos</small></div></li>
+          <li><div>Backup criptografado (AES-256)</div></li>
+          <li><div>Atualizações com aviso<small>instala em um clique</small></div></li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PERSONAGENS ================= -->
+  <section id="personagens">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="eyebrow">Quatro personalidades</span>
+        <h2>Escolha <span class="accent">quem vai te atender</span></h2>
+        <p>Cada personagem tem jeito de falar, cor e nível de inteligência próprios. Troque a qualquer momento dizendo, por exemplo, “chama a Lyra”.</p>
+      </div>
+      <div class="personas">
+        <div class="p-list" id="p-list" role="radiogroup" aria-label="Personagens">
+          <button class="p-card on" type="button" role="radio" aria-checked="true" data-p="orion" style="--pc:#4fd8ff"><span class="p-dot">O</span><span><b>ORION</b><p>Elegante, cordial e eficiente. O mais econômico, feito para o dia a dia.</p></span><em>DIA A DIA</em></button>
+          <button class="p-card" type="button" role="radio" aria-checked="false" data-p="lyra" style="--pc:#ffab5c"><span class="p-dot">L</span><span><b>LYRA</b><p>Rápida, calorosa e prática, com jeito descontraído.</p></span><em>EQUILIBRADA</em></button>
+          <button class="p-card" type="button" role="radio" aria-checked="false" data-p="atlas" style="--pc:#ffcc4d"><span class="p-dot">A</span><span><b>ATLAS</b><p>Calmo e profundo. Ótimo para estudar e pensar com cuidado.</p></span><em>MAIS SÁBIO</em></button>
+          <button class="p-card" type="button" role="radio" aria-checked="false" data-p="vortex" style="--pc:#ff5a4a"><span class="p-dot">V</span><span><b>VÓRTEX</b><p>Teatral e confiante. O mais poderoso para tarefas longas.</p></span><em>MAIS PODEROSO</em></button>
+        </div>
+        <div class="p-stage">
+          <canvas id="orb2" aria-label="Esfera do personagem escolhido. Arraste para girar."></canvas>
+          <div class="p-quote" id="p-quote"><small>ORION DIZ</small>Sistemas prontos, Senhor. Em que posso ajudar?</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DEMO ================= -->
+  <section class="alt">
+    <div class="wrap demo">
+      <div>
+        <div class="sec-head rv" style="margin-bottom:26px">
+          <span class="eyebrow">Na prática</span>
+          <h2>Você pede. <span class="accent">Ele faz.</span></h2>
+          <p>Nada de menus complicados. Fale do seu jeito e o ORION escolhe a ferramenta certa.</p>
+        </div>
+        <ul class="say">
+          <li class="rv">“Orion, me lembra de tomar o remédio às 8 da noite.”<span>Cria o lembrete e avisa na hora, falando.</span></li>
+          <li class="rv">“Gastei 120 no posto, no cartão.”<span>Anota em Transporte e soma na fatura do cartão.</span></li>
+          <li class="rv">“Me mostra como funciona um motor V8.”<span>Abre o holograma e monta o motor peça por peça.</span></li>
+          <li class="rv">“Chama a Lyra.”<span>Troca o personagem, a cor e a voz na hora.</span></li>
+        </ul>
+      </div>
+      <div class="chat edge rv" aria-label="Exemplo de conversa com o ORION">
+        <div class="chat-top"><i></i>CONVERSA · EXEMPLO AO VIVO</div>
+        <div class="chat-body" id="chat"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COMO FUNCIONA ================= -->
+  <section>
+    <div class="wrap">
+      <div class="sec-head center rv"><span class="eyebrow">Como começar</span><h2>Pronto em <span class="accent">poucos minutos</span></h2></div>
+      <div class="steps">
+        <div class="step edge rv"><span class="ic">📦</span><h3>Instale</h3><p>Baixe o instalador e clique em Avançar. Não precisa ser administrador.</p></div>
+        <div class="step edge rv"><span class="ic">🔐</span><h3>Crie seu login</h3><p>Seu nome e uma senha. O ORION passa a te chamar pelo nome.</p></div>
+        <div class="step edge rv"><span class="ic">🧠</span><h3>Ligue o cérebro</h3><p>Cole a sua chave da IA (o guia mostra cada clique) e escolha a sua cidade.</p></div>
+        <div class="step edge rv"><span class="ic">🎙️</span><h3>Converse</h3><p>Clique em “Falar com o ORION” ou diga “Orion…” e peça o que quiser.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SEGURANÇA ================= -->
+  <section id="seguranca" class="alt">
+    <div class="wrap">
+      <div class="sec-head rv">
+        <span class="eyebrow">Privacidade e segurança</span>
+        <h2>Seu assistente, <span class="accent">suas regras</span></h2>
+        <p>O ORION roda no seu computador. Suas memórias, finanças e treinos não vão para servidor nenhum do vendedor.</p>
+      </div>
+      <div class="shield">
+        <div class="sh edge rv"><span class="ic">🔐</span><div><h3>Login a cada abertura</h3><p>Senha guardada com hash forte e código de recuperação só seu.</p></div></div>
+        <div class="sh edge rv"><span class="ic">✋</span><div><h3>Você aprova as ações</h3><p>Antes de rodar um programa ou gravar um arquivo, ele mostra o que vai fazer e espera o seu sim.</p></div></div>
+        <div class="sh edge rv"><span class="ic">💾</span><div><h3>Backup criptografado</h3><p>Leve tudo para outro PC em um arquivo protegido com AES-256 e uma senha sua.</p></div></div>
+        <div class="sh edge rv"><span class="ic">🏠</span><div><h3>Dados no seu PC</h3><p>Tudo fica na sua pasta de usuário do Windows. Desinstalar não apaga seus dados.</p></div></div>
+        <div class="sh edge rv"><span class="ic">🧠</span><div><h3>Sua própria conta de IA</h3><p>A inteligência usa a sua conta e a sua chave. Você controla o uso e o gasto.</p></div></div>
+        <div class="sh edge rv"><span class="ic">🛡️</span><div><h3>Protegido contra golpes</h3><p>Texto de sites, telas e arquivos é tratado como informação, nunca como ordem.</p></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PREÇO ================= -->
+  <section id="preco">
+    <div class="wrap">
+      <div class="sec-head center rv"><span class="eyebrow">Planos</span><h2>Escolha como quer <span class="accent">começar</span></h2>
+        <p>Pagamento único, sem mensalidade do programa. Preço de lançamento para os <b>primeiros 20 clientes</b>.</p></div>
+      <div class="plans">
+        <div class="price rv">
+          <div class="seal" aria-hidden="true">
+          <svg viewBox="0 0 100 100"><defs><path id="cp1" d="M50 50 m-38 0 a38 38 0 1 1 76 0 a38 38 0 1 1 -76 0"/></defs>
+            <circle cx="50" cy="50" r="46" fill="none" stroke="#5be3a1" stroke-opacity=".5" stroke-width="1" stroke-dasharray="2 3"/>
+            <text fill="#8eaec6" font-family="Michroma, sans-serif" font-size="7.6" letter-spacing="2.4"><textPath href="#cp1">GARANTIA · SATISFAÇÃO · GARANTIA · SATISFAÇÃO ·</textPath></text></svg>
+          <b>7<small>DIAS</small></b>
+        </div>
+          <span class="tag">PLANO ESSENCIAL</span>
+          <h3>ORION</h3>
+          <p class="plan-sub">Você instala sozinho, com o guia passo a passo e o assistente do programa.</p>
+          <div class="amount"><s>R$ 197</s><b>R$ 147</b><small>à vista ou parcelado</small></div>
+          <ul class="incl">
+            <li>Programa completo com todos os módulos</li><li>Os 4 personagens de IA</li><li>Atualizações automáticas incluídas</li>
+            <li>Guia de instalação em PDF, com imagens</li><li>Assistente de configuração no programa</li><li>Suporte por e-mail em português</li><li>7 dias de garantia</li>
+          </ul>
+          <a class="btn pri mag" href="#preco" data-buy>Quero o ORION</a>
+        </div>
+        <div class="price plus rv">
+          <div class="seal" aria-hidden="true">
+          <svg viewBox="0 0 100 100"><defs><path id="cp2" d="M50 50 m-38 0 a38 38 0 1 1 76 0 a38 38 0 1 1 -76 0"/></defs>
+            <circle cx="50" cy="50" r="46" fill="none" stroke="#5be3a1" stroke-opacity=".5" stroke-width="1" stroke-dasharray="2 3"/>
+            <text fill="#8eaec6" font-family="Michroma, sans-serif" font-size="7.6" letter-spacing="2.4"><textPath href="#cp2">GARANTIA · SATISFAÇÃO · GARANTIA · SATISFAÇÃO ·</textPath></text></svg>
+          <b>7<small>DIAS</small></b>
+        </div>
+          <span class="tag">MAIS TRANQUILO · RECOMENDADO</span>
+          <h3>ORION + INSTALAÇÃO ASSISTIDA</h3>
+          <p class="plan-sub">A gente instala e configura tudo junto com você, por chamada de vídeo.</p>
+          <div class="amount"><s>R$ 397</s><b>R$ 297</b><small>à vista ou parcelado</small></div>
+          <ul class="incl">
+            <li>Tudo do plano ORION</li><li>Instalação e configuração com você, em cerca de 45 minutos</li>
+            <li>Ajuda para criar a conta da IA e a sua chave</li><li>Voz e cidade configuradas e primeira conversa testada</li>
+            <li>Agendamento por e-mail em até 3 dias úteis</li><li>7 dias de garantia</li>
+          </ul>
+          <a class="btn pri mag" href="#preco" data-buy-assist>Quero com instalação assistida</a>
+          <p class="fine">Na chamada, é você quem digita senhas e dados do cartão. Nunca pedimos esses dados.</p>
+        </div>
+      </div>
+      <p class="plans-note rv">Os dois planos usam a inteligência artificial da Anthropic, paga à parte, direto a eles. Veja abaixo todos os <a href="#gastos">gastos adicionais</a> antes de comprar.</p>
+    </div>
+  </section>
+
+  <!-- ================= GASTOS ADICIONAIS ================= -->
+  <section id="gastos" class="alt">
+    <div class="wrap">
+      <div class="sec-head center rv"><span class="eyebrow">Transparência total</span><h2>Gastos adicionais para o <span class="accent">ORION funcionar</span></h2>
+        <p>Além do preço do programa, existe um único gasto obrigatório: o crédito da inteligência artificial. Tudo explicado aqui, sem letras miúdas.</p></div>
+      <div class="costs-grid">
+        <div class="cost edge rv must">
+          <span class="ct">OBRIGATÓRIO</span>
+          <h3>🧠 Inteligência artificial (Anthropic)</h3>
+          <p>O cérebro do ORION é o Claude, da empresa Anthropic. Ele funciona com uma <b>chave da sua própria conta</b>, criada em console.anthropic.com.</p>
+          <ul>
+            <li><b>Crédito pré-pago</b>, a partir de <b>US$ 5</b> (cerca de R$ 30, conforme o câmbio).</li>
+            <li>Cobrado <b>em dólar</b>, no seu <b>cartão de crédito internacional</b>, com IOF do cartão.</li>
+            <li>Você paga <b>só o que usar</b>. Sem recarga automática, nunca gasta mais do que colocou.</li>
+            <li>A cobrança é feita pela Anthropic, não pelo ORION.</li>
+          </ul>
+        </div>
+        <div class="cost edge rv">
+          <span class="ct opt">OPCIONAL</span>
+          <h3>🎙️ Voz natural (Fish Audio)</h3>
+          <p>Sem nada a mais, o ORION fala com a <b>voz do Windows, de graça</b>. Para uma voz natural, dá para ligar o Fish Audio, um serviço pago à parte, com planos no site fish.audio.</p>
+          <span class="ct opt" style="margin-top:14px">GRÁTIS</span>
+          <ul>
+            <li>Atualizações do programa.</li><li>Suporte por e-mail.</li>
+            <li>Clima, notícias e câmbio (fontes públicas).</li><li>Tocar as suas próprias músicas em MP3.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="est edge rv">
+        <h3>Quanto rende o crédito da IA? <small>(estimativas)</small></h3>
+        <div class="est-grid">
+          <div><b>≈ 5.000</b><span>mensagens curtas com o <b>ORION</b>, o personagem do dia a dia</span></div>
+          <div><b>≈ 250</b><span>com a <b>LYRA</b>, para respostas mais caprichadas</span></div>
+          <div><b>≈ 125</b><span>com o <b>ATLAS</b>, para respostas longas e pensadas</span></div>
+          <div><b>≈ 50</b><span>com o <b>VÓRTEX</b>, para tarefas grandes e difíceis</span></div>
+        </div>
+        <p class="fine">Valores para US$ 5 de crédito. No uso leve do dia a dia com o ORION (umas 20 perguntas por dia), o gasto costuma ficar em torno de <b>US$ 1 por mês</b>. Fotos, prints, conversas muito longas, a leitura de tela ligada o tempo todo e os personagens mais fortes gastam mais. São estimativas com base na tabela de preços da Anthropic, que pode mudar. Você acompanha o gasto no site deles e pode definir um limite mensal.</p>
+      </div>
+      <div class="sum rv">
+        <b>Resumo para começar:</b> o plano escolhido (R$ 147 ou R$ 297) + <b>US$ 5 de crédito</b> na Anthropic. Mais nada é obrigatório.
+      </div>
+      <div class="req req-row">
+        <div class="edge rv"><span>🪟</span><span><b>Windows 10 ou 11</b><p>Computador ou notebook. Não funciona no Mac nem no celular.</p></span></div>
+        <div class="edge rv"><span>🌐</span><span><b>Internet</b><p>Para a inteligência artificial, o clima e as notícias.</p></span></div>
+        <div class="edge rv"><span>💳</span><span><b>Cartão internacional</b><p>Para colocar crédito na Anthropic (crédito ou virtual).</p></span></div>
+        <div class="edge rv"><span>🎧</span><span><b>Microfone e som</b><p>Opcional. Sem microfone, dá para usar tudo digitando.</p></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FAQ ================= -->
+  <section id="faq" class="alt">
+    <div class="wrap">
+      <div class="sec-head center rv"><span class="eyebrow">Dúvidas frequentes</span><h2>Perguntas que <span class="accent">todo mundo faz</span></h2></div>
+      <div class="faq">
+        <details><summary>Preciso pagar mensalidade?</summary><p>Pelo programa, não: o pagamento é único. A inteligência artificial é cobrada pela Anthropic conforme o uso, na sua própria conta. Você coloca o crédito que quiser e pode deixar a recarga automática desligada, assim nunca gasta mais do que colocou.</p></details>
+        <details><summary>Quanto gasto com a inteligência artificial?</summary><p>Depende de quanto você usa. Para começar, US$ 5 de crédito na Anthropic (cerca de R$ 30). No uso leve do dia a dia com o personagem ORION, o gasto costuma ficar em torno de US$ 1 por mês. Fotos, prints, a leitura de tela ligada o tempo todo e os personagens mais fortes gastam mais. Veja a seção <a href="#gastos" style="color:var(--cyan)">Gastos adicionais</a>.</p></details>
+        <details><summary>Preciso de cartão internacional?</summary><p>Sim, para colocar crédito na Anthropic, que cobra em dólar. Serve cartão de crédito com compras internacionais liberadas, ou um cartão virtual do seu banco. O ORION em si você paga em reais, por Pix, boleto ou cartão.</p></details>
+        <details><summary>Como funciona a instalação assistida?</summary><p>Depois da compra, você recebe um e-mail para marcar o horário (em até 3 dias úteis). Na chamada de vídeo, com a sua autorização, a gente acompanha a instalação na sua tela, ajuda a criar a conta da IA e a chave, configura voz e cidade e testa a primeira conversa. Senhas e dados do cartão é você quem digita: nunca pedimos esses dados.</p></details>
+        <details><summary>Funciona no Mac ou no celular?</summary><p>Esta versão é para computadores com Windows 10 ou 11.</p></details>
+        <details><summary>Meus dados vão para algum servidor?</summary><p>Suas memórias, tarefas, finanças e treinos ficam no seu computador. As mensagens que você manda vão para a IA (na sua conta) só para gerar a resposta. A política de privacidade explica cada detalhe.</p></details>
+        <details><summary>Ele mexe no meu computador sozinho?</summary><p>Abrir pastas, sites e músicas é direto. Rodar programas e gravar arquivos sempre mostra um pedido de “Aprovar ou Negar” antes.</p></details>
+        <details><summary>E se eu esquecer a senha?</summary><p>Na criação do login você recebe um código de recuperação. Com ele, troca a senha na própria tela de login.</p></details>
+        <details><summary>Como recebo as atualizações?</summary><p>Sozinho. O ORION confere a internet, baixa a versão nova, confere se o arquivo é o original e avisa com som. Você só clica em “Instalar agora”, sem perder nada. As atualizações estão incluídas.</p></details>
+        <details><summary>E se eu não gostar?</summary><p>Você tem 7 dias de garantia, conforme o Código de Defesa do Consumidor.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FINAL ================= -->
+  <section class="final">
+    <div class="rings" aria-hidden="true"><i></i><i style="animation-delay:2s"></i><i style="animation-delay:4s"></i></div>
+    <div class="wrap">
+      <span class="eyebrow">Sistemas prontos</span>
+      <h2>Seu centro de comando com <span class="shine">inteligência artificial</span> está a um clique.</h2>
+      <p>Instale hoje e comece a conversar com o ORION em poucos minutos.</p>
+      <div class="cta"><a class="btn pri mag" href="#preco" data-buy>Quero o ORION</a><a class="btn ghost mag" href="#faq">Tirar dúvidas</a></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="f-row">
+      <a class="brand" href="#inicio"><span class="logo"><span></span></span><b>ORION</b></a>
+      <span>Suporte: <a id="mail" href="mailto:orion.suporte.br@gmail.com" style="color:inherit">orion.suporte.br@gmail.com</a></span>
+    </div>
+    <div class="f-row">
+      <span>© <span id="yr">2026</span> ORION Assistente</span>
+      <span>Termos de uso · Política de privacidade · Licenças</span>
+    </div>
+    <p style="font-size:12.5px;font-weight:300">Clima: MET Norway (CC BY 4.0) · Notícias: Agência Brasil (CC BY 4.0) · Câmbio: Banco Central do Brasil. “Claude” e “Anthropic” são marcas da Anthropic PBC, citadas só para indicar compatibilidade. O ORION não tem ligação oficial com essas empresas.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // ====== CONFIGURE AQUI ======
+  const CHECKOUT_URL = "";          // link de pagamento do plano ORION (Kiwify). Vazio = rola até o preço.
+  const CHECKOUT_ASSISTIDA = "";    // link de pagamento do ORION + instalação assistida
+  // ============================
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const $ = (s, r = document) => r.querySelector(s);
+  $("#yr").textContent = new Date().getFullYear();
+  if (CHECKOUT_URL) document.querySelectorAll("[data-buy]").forEach((a) => { a.href = CHECKOUT_URL; a.target = "_blank"; a.rel = "noopener"; });
+  if (CHECKOUT_ASSISTIDA) document.querySelectorAll("[data-buy-assist]").forEach((a) => { a.href = CHECKOUT_ASSISTIDA; a.target = "_blank"; a.rel = "noopener"; });
+
+  // ---------------- sons do painel (WebAudio, só depois de um clique; desligados por padrão)
+  let ac = null, soundOn = false;
+  const audio = () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch {} return ac; };
+  function tone(f, d = .08, type = "sine", vol = .05, glide = 0) {
+    if (!soundOn || !audio()) return; const t0 = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t0); if (glide) o.frequency.exponentialRampToValueAtTime(f * glide, t0 + d);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + d);
+    o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + d + .02);
+  }
+  const chime = () => { [523, 784, 1046, 1568].forEach((f, i) => setTimeout(() => tone(f, .32, "sine", .045), i * 110)); };
+  const blip = () => tone(1800, .04, "square", .012);
+  const click = () => tone(660, .09, "triangle", .04, 1.6);
+  const sBtn = $("#sound");
+  sBtn.addEventListener("click", () => { soundOn = !soundOn; sBtn.classList.toggle("on", soundOn); sBtn.setAttribute("aria-pressed", soundOn); if (soundOn) chime(); });
+  document.addEventListener("pointerover", (e) => { if (e.target.closest(".btn, .p-card, .menu a, .faq summary")) blip(); });
+  document.addEventListener("click", (e) => { if (e.target.closest(".btn, .p-card, .faq summary")) click(); });
+
+  // ---------------- boot do sistema (curto; toque para pular)
+  (() => {
+    const boot = $("#boot"); let seen = false; try { seen = sessionStorage.getItem("orion_boot") === "1"; } catch {}
+    if (reduce || seen) { boot.classList.add("off"); return; }
+    const log = $("#boot-log"), bar = $("#boot-bar"), L = ["NÚCLEO DE IA", "RECONHECIMENTO DE VOZ", "MÓDULOS 3D", "PAINEL DE COMANDO"];
+    let i = 0, done = false;
+    const end = () => { if (done) return; done = true; boot.classList.add("off"); try { sessionStorage.setItem("orion_boot", "1"); } catch {} };
+    boot.addEventListener("click", end);
+    const step = () => { if (done) return; if (i < L.length) { const d = document.createElement("div"); d.innerHTML = `<span>${L[i]}</span><b>OK</b>`; log.appendChild(d); i++; bar.style.width = (i / L.length * 100) + "%"; setTimeout(step, 260); } else setTimeout(end, 380); };
+    setTimeout(step, 250); setTimeout(end, 2600);
+  })();
+
+  // ---------------- topo sólido, barra de progresso, brilho do cursor
+  const top = $("#top"), prog = $("#progress"), glow = $("#glow");
+  const onScroll = () => { const y = scrollY, h = document.documentElement.scrollHeight - innerHeight; top.classList.toggle("solid", y > 20); prog.style.transform = `scaleX(${h > 0 ? y / h : 0})`; tiltMock(); };
+  addEventListener("scroll", onScroll, { passive: true });
+  if (fine && !reduce) { addEventListener("pointermove", (e) => { glow.style.opacity = 1; glow.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`; mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true }); }
+
+  // ---------------- fundo: rede de partículas (liga pontos próximos e o cursor)
+  const mouse = { x: -999, y: -999 };
+  (() => {
+    const c = $("#net"), x = c.getContext("2d"); let W, H, P = [];
+    const size = () => { const d = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; c.width = W * d; c.height = H * d; x.setTransform(d, 0, 0, d, 0, 0);
+      const n = Math.min(110, Math.round(W * H / 14000)); P = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.4 + .4 })); };
+    size(); addEventListener("resize", size);
+    const draw = () => {
+      x.clearRect(0, 0, W, H);
+      for (const p of P) { if (!reduce) { p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > W) p.vx *= -1; if (p.y < 0 || p.y > H) p.vy *= -1; }
+        x.fillStyle = "rgba(120,220,255,.7)"; x.beginPath(); x.arc(p.x, p.y, p.r, 0, 6.283); x.fill(); }
+      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const a = P[i], b = P[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < 120) { x.strokeStyle = `rgba(79,216,255,${(1 - d / 120) * .16})`; x.lineWidth = 1; x.beginPath(); x.moveTo(a.x, a.y); x.lineTo(b.x, b.y); x.stroke(); } }
+      for (const p of P) { const d = Math.hypot(p.x - mouse.x, p.y - mouse.y); if (d < 170) { x.strokeStyle = `rgba(184,243,255,${(1 - d / 170) * .45})`; x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(mouse.x, mouse.y); x.stroke(); } }
+      if (!reduce) requestAnimationFrame(draw);
+    };
+    draw();
+  })();
+
+  // ---------------- marcas do mostrador (60 traços)
+  $("#ticks").innerHTML = Array.from({ length: 60 }, (_, i) => { const a = i * 6 * Math.PI / 180, r1 = 46, r2 = i % 5 ? 47.6 : 49;
+    return `<line x1="${50 + r1 * Math.cos(a)}" y1="${50 + r1 * Math.sin(a)}" x2="${50 + r2 * Math.cos(a)}" y2="${50 + r2 * Math.sin(a)}" stroke="#4fd8ff" stroke-opacity="${i % 5 ? .35 : .8}" stroke-width="${i % 5 ? .25 : .5}"/>`; }).join("");
+
+  // ---------------- esfera holográfica (pontos de Fibonacci ligados, girando; arraste em 360°)
+  function makeOrb(canvas, opts = {}) {
+    const ctx = canvas.getContext("2d");
+    const N = opts.n || 300, pts = [], ga = Math.PI * (3 - Math.sqrt(5));
+    for (let i = 0; i < N; i++) { const y = 1 - (i / (N - 1)) * 2, r = Math.sqrt(1 - y * y), th = ga * i; pts.push({ x: Math.cos(th) * r, y, z: Math.sin(th) * r, ph: Math.random() * 6.283 }); }
+    const links = []; const lim = N > 250 ? .085 : N > 180 ? .11 : .16;
+    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y, dz = pts[i].z - pts[j].z; if (dx * dx + dy * dy + dz * dz < lim) links.push([i, j]); }
+    const PAL = { orion: { idle: [79, 216, 255], listening: [91, 227, 161], thinking: [255, 184, 77], speaking: [150, 238, 255] },
+      lyra: { idle: [255, 171, 92], listening: [111, 224, 184], thinking: [255, 122, 168], speaking: [255, 214, 160] },
+      atlas: { idle: [255, 204, 77], listening: [94, 227, 154], thinking: [255, 140, 90], speaking: [255, 230, 150] },
+      vortex: { idle: [255, 70, 55], listening: [255, 150, 60], thinking: [215, 220, 228], speaking: [255, 120, 100] } };
+    let look = "orion", colors = PAL.orion; const cur = colors.idle.slice();
+    let state = "idle", level = 0, t = 0, last = 0, rotY = 0, w = 300, h = 300, visible = true, burst = 0;
+    const xs = new Float32Array(N), ys = new Float32Array(N), zs = new Float32Array(N);
+    let q = [0, 0, 0, 1], grabbed = false, velX = 0, velY = 0, spin = 1, lastDrag = 0, px = 0, py = 0, releasedAt = -9;
+    const rotate = (ax, ay) => { const ang = Math.hypot(ax, ay); if (ang < 1e-6) return; const sn = Math.sin(ang / 2) / ang, a = [ax * sn, ay * sn, 0, Math.cos(ang / 2)], [X, Y, Z, Wq] = q;
+      q = [a[3] * X + a[0] * Wq + a[1] * Z - a[2] * Y, a[3] * Y - a[0] * Z + a[1] * Wq + a[2] * X, a[3] * Z + a[0] * Y - a[1] * X + a[2] * Wq, a[3] * Wq - a[0] * X - a[1] * Y - a[2] * Z];
+      const l = Math.hypot(...q); q = q.map((c) => c / l); };
+    if (opts.drag !== false) {
+      canvas.addEventListener("pointerdown", (e) => { grabbed = true; velX = velY = 0; px = e.clientX; py = e.clientY; lastDrag = performance.now(); try { canvas.setPointerCapture(e.pointerId); } catch {} canvas.classList.add("grab"); });
+      canvas.addEventListener("pointermove", (e) => { if (!grabbed) return; const dx = e.clientX - px, dy = e.clientY - py, now = performance.now(), dts = Math.max(.004, (now - lastDrag) / 1000), k = .0105;
+        px = e.clientX; py = e.clientY; lastDrag = now; rotate(-dy * k, dx * k); velX += (-dy * k / dts - velX) * .35; velY += (dx * k / dts - velY) * .35; });
+      const end = () => { if (!grabbed) return; grabbed = false; releasedAt = t; canvas.classList.remove("grab"); if (performance.now() - lastDrag > 90) velX = velY = 0;
+        const m = Math.hypot(velX, velY); if (m > 9) { velX *= 9 / m; velY *= 9 / m; } };
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach((ev) => canvas.addEventListener(ev, end));
+    }
+    const resize = () => { const r = canvas.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); w = Math.max(2, r.width); h = Math.max(2, r.height); canvas.width = w * d; canvas.height = h * d; ctx.setTransform(d, 0, 0, d, 0, 0); };
+    resize(); try { new ResizeObserver(resize).observe(canvas); } catch {}
+    try { new IntersectionObserver((es) => { visible = es[0].isIntersecting; }).observe(canvas); } catch {}
+    function lookPass(cx, cy, R, col) {
+      if (look === "atlas") { const s2 = R * (.2 + level * .05), pul = .6 + .4 * Math.sin(t * 2.4);
+        const gl = ctx.createRadialGradient(cx, cy, 0, cx, cy, s2 * 3.4); gl.addColorStop(0, `rgba(255,214,90,${.55 * pul})`); gl.addColorStop(1, "rgba(255,214,90,0)"); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, s2 * 3.4, 0, 6.283); ctx.fill();
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.sin(t * .6) * .15); const g2 = ctx.createLinearGradient(0, -s2, 0, s2); g2.addColorStop(0, "#fff6c8"); g2.addColorStop(.5, "#ffcf3d"); g2.addColorStop(1, "#c98a00");
+        ctx.beginPath(); ctx.moveTo(0, -s2); ctx.lineTo(s2 * .72, 0); ctx.lineTo(0, s2); ctx.lineTo(-s2 * .72, 0); ctx.closePath(); ctx.fillStyle = g2; ctx.fill(); ctx.strokeStyle = "rgba(255,250,220,.9)"; ctx.lineWidth = 1.2; ctx.stroke(); ctx.restore();
+      } else if (look === "vortex") { const pul = .65 + .35 * Math.sin(t * 3.1) + level * .4, w2 = R * .62, h2 = R * (.08 + level * .05);
+        const gl = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * .9); gl.addColorStop(0, `rgba(255,40,30,${.45 * pul})`); gl.addColorStop(1, "rgba(255,40,30,0)"); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(cx, cy, R * .9, 0, 6.283); ctx.fill();
+        [-1, 1].forEach((sd) => { ctx.save(); ctx.translate(cx + sd * w2 * .32, cy); ctx.rotate(sd * .16); ctx.beginPath(); ctx.ellipse(0, 0, w2 * .3, h2, 0, 0, 6.283); ctx.fillStyle = `rgba(255,${90 + level * 80 | 0},70,${Math.min(1, .75 * pul)})`; ctx.shadowColor = "#ff2a1f"; ctx.shadowBlur = 18; ctx.fill(); ctx.restore(); });
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(-t * .25); for (let k = 0; k < 12; k++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.arc(0, 0, R * 1.18, -.2, .2); ctx.strokeStyle = col(.55); ctx.lineWidth = 3; ctx.stroke(); } ctx.restore();
+      } else if (look === "lyra") { [[1.12, 1.1, 1.6], [1.24, -.7, 2.4]].forEach(([rr, sp, len]) => { ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * sp); ctx.beginPath(); ctx.arc(0, 0, R * rr, 0, len); ctx.strokeStyle = col(.7); ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, R * rr, Math.PI, Math.PI + len * .6); ctx.strokeStyle = col(.35); ctx.stroke(); ctx.restore(); }); }
+    }
+    function frame(ts) {
+      requestAnimationFrame(frame);
+      if (!visible && !grabbed) { last = ts; return; }
+      const dt = Math.min(.05, (ts - last) / 1000 || .016); last = ts; t += dt; burst *= Math.exp(-dt * 2.2);
+      level += (api.level - level) * .22;
+      const tc = colors[state] || colors.idle; for (let k = 0; k < 3; k++) cur[k] += (tc[k] - cur[k]) * .08;
+      const col = (a) => `rgba(${cur[0] | 0},${cur[1] | 0},${cur[2] | 0},${a})`;
+      ctx.clearRect(0, 0, w, h);
+      const cx = w / 2, cy = h * (opts.cy || .46), R = Math.min(w, h) * (opts.scale || .27) * (1 + burst * .08);
+      const g = ctx.createRadialGradient(cx, cy, R * .2, cx, cy, R * (1.7 + level * .9)); g.addColorStop(0, col(.28 + level * .38 + burst * .2)); g.addColorStop(1, col(0)); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+      if (burst > .02) { ctx.beginPath(); ctx.arc(cx, cy, R * (1 + (1 - burst) * 1.6), 0, 6.283); ctx.strokeStyle = col(burst * .7); ctx.lineWidth = 2; ctx.stroke(); }
+      if (!opts.mini) for (let k = 0; k < 4; k++) { const rr = R * (.95 + k * .3 + level * .06 * k); ctx.beginPath(); ctx.ellipse(cx, cy + R * 1.3, rr, rr * .2, 0, 0, 6.283); ctx.strokeStyle = col(Math.max(.04, .24 - k * .045 + level * .14)); ctx.lineWidth = 1; ctx.stroke(); }
+      [[1.5, .42, .5], [1.32, .34, -.7], [1.66, .5, 2.2]].forEach(([a, b, rot], i) => { ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot + t * .05 * (i % 2 ? -1 : 1)); ctx.beginPath(); ctx.ellipse(0, 0, R * a, R * b, 0, 0, 6.283);
+        ctx.strokeStyle = col(.22 + level * .22); ctx.lineWidth = 1; ctx.stroke(); const ang = t * (.6 + i * .25) + i * 2; ctx.beginPath(); ctx.arc(Math.cos(ang) * R * a, Math.sin(ang) * R * b, 2.2 + level * 2.4, 0, 6.283); ctx.fillStyle = col(.95); ctx.fill(); ctx.restore(); });
+      if (grabbed) spin = 0; else { rotate(velX * dt, velY * dt); const dec = Math.exp(-dt * 2.4); velX *= dec; velY *= dec; const since = t - releasedAt;
+        if (since > .35) { const back = 1 - Math.exp(-dt * 1.7 * Math.min(1, (since - .35) / .8)), sg = q[3] < 0 ? -1 : 1; q = [q[0] * (1 - back), q[1] * (1 - back), q[2] * (1 - back), q[3] * (1 - back) + sg * back]; const l = Math.hypot(...q); q = q.map((c) => c / l); }
+        spin = Math.min(1, spin + dt * .9); }
+      rotY += dt * (.25 + level * 1.4 + burst * 2) * spin * (reduce ? .2 : 1);
+      const cY = Math.cos(rotY), sY = Math.sin(rotY), cX = Math.cos(.38), sX = Math.sin(.38), [qx, qy, qz, qw] = q, turned = qx || qy || qz;
+      const m00 = 1 - 2 * (qy * qy + qz * qz), m01 = 2 * (qx * qy - qz * qw), m02 = 2 * (qx * qz + qy * qw), m10 = 2 * (qx * qy + qz * qw), m11 = 1 - 2 * (qx * qx + qz * qz), m12 = 2 * (qy * qz - qx * qw), m20 = 2 * (qx * qz - qy * qw), m21 = 2 * (qy * qz + qx * qw), m22 = 1 - 2 * (qx * qx + qy * qy);
+      for (let i = 0; i < N; i++) { const p = pts[i], d = 1 + .03 * Math.sin(t * 1.5 + p.ph) + level * (.24 * Math.sin(t * 9 + p.ph * 2.3 + p.y * 5) + .1 * Math.sin(t * 5 + p.ph)) + burst * .25 * Math.sin(p.ph * 3);
+        const x1 = p.x * cY + p.z * sY, z1 = -p.x * sY + p.z * cY, y1 = p.y * cX - z1 * sX, z2 = p.y * sX + z1 * cX;
+        const fx = turned ? m00 * x1 + m01 * y1 + m02 * z2 : x1, fy = turned ? m10 * x1 + m11 * y1 + m12 * z2 : y1, fz = turned ? m20 * x1 + m21 * y1 + m22 * z2 : z2;
+        xs[i] = cx + fx * d * R; ys[i] = cy + fy * d * R; zs[i] = (fz + 1) / 2; }
+      const bk = [[], [], []]; for (const [i, j] of links) { const z = (zs[i] + zs[j]) / 2; bk[z < .35 ? 0 : z < .65 ? 1 : 2].push(i, j); }
+      [.07, .17, .38].forEach((a, bi) => { const b = bk[bi]; if (!b.length) return; ctx.beginPath(); for (let k = 0; k < b.length; k += 2) { ctx.moveTo(xs[b[k]], ys[b[k]]); ctx.lineTo(xs[b[k + 1]], ys[b[k + 1]]); } ctx.strokeStyle = col(a + level * .25); ctx.lineWidth = 1; ctx.stroke(); });
+      for (let i = 0; i < N; i++) { const z = zs[i]; ctx.beginPath(); ctx.arc(xs[i], ys[i], .7 + 1.9 * z + level * 1.3, 0, 6.283); ctx.fillStyle = col(.25 + .75 * z); ctx.fill(); }
+      lookPass(cx, cy, R, col);
+    }
+    const api = { level: 0, setState(s) { state = s; }, setLook(id) { look = id; colors = PAL[id] || PAL.orion; burst = 1; }, pulse() { burst = 1; }, get grabbed() { return grabbed; } };
+    requestAnimationFrame(frame);
+    return api;
+  }
+
+  const orb = makeOrb($("#orb"));
+  const orb2 = makeOrb($("#orb2"), { n: 220 });
+  const orb3 = makeOrb($("#orb3"), { n: 160, mini: true, scale: .3, cy: .55, drag: false });
+  orb3.setState("listening");
+
+  // ---------------- onda de voz embaixo da esfera
+  const wv = $("#wave"), wx = wv.getContext("2d"); let wt = 0;
+  const wsize = () => { const r = wv.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1); wv.width = r.width * d; wv.height = r.height * d; wx.setTransform(d, 0, 0, d, 0, 0); };
+  wsize(); addEventListener("resize", wsize);
+  (function waveLoop() {
+    wt += .016; const W = wv.clientWidth, H = wv.clientHeight, n = 48, lv = orb.level; wx.clearRect(0, 0, W, H);
+    for (let i = 0; i < n; i++) { const x = (i + .5) * W / n, env = Math.sin(Math.PI * i / (n - 1)), a = (.06 + lv * .94) * env * (.35 + .65 * Math.abs(Math.sin(wt * 6 + i * .55) * Math.cos(wt * 2.3 + i * .21)));
+      const bh = Math.max(2, a * H * .95); wx.fillStyle = `rgba(79,216,255,${.35 + a * .65})`; wx.fillRect(x - 1.5, (H - bh) / 2, 3, bh); }
+    requestAnimationFrame(waveLoop);
+  })();
+
+  // ---------------- a esfera fala: voz original no estilo mordomo (voz natural do navegador, se houver)
+  const LINES = [
+    "Boa noite, Senhor. Sistemas operacionais online.",
+    "Eu sou o Orion, o seu assistente pessoal.",
+    "Organizo o seu dia, lembro das suas tarefas e cuido das suas finanças, com a discrição de sempre.",
+    "Também projeto hologramas em três dimensões e explico tudo em voz alta.",
+    "É só dizer: Orion. Estarei à sua disposição.",
+  ];
+  const greet = () => { const h = new Date().getHours(); return h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite"; };
+  const stateEl = $("#state"), sub = $("#subtitle"), btn = $("#speak");
+  const STATES = { idle: ["EM ESPERA", "var(--cyan)"], listening: ["OUVINDO", "var(--green)"], thinking: ["PROCESSANDO", "var(--gold)"], speaking: ["FALANDO", "var(--ice)"] };
+  const setState = (s) => { orb.setState(s); stateEl.innerHTML = `<i></i>${STATES[s][0]}`; stateEl.style.color = STATES[s][1]; };
+  let talking = false, manual = false, pulseT = 0, boost = 0, token = 0;
+  (function levelLoop() {
+    pulseT += .016; boost *= .9;
+    const base = talking ? .3 + .24 * Math.abs(Math.sin(pulseT * 7.3)) * Math.abs(Math.sin(pulseT * 2.1 + 1)) + boost : 0;
+    orb.level = Math.min(1, base); $("#hud-level").textContent = String(Math.round(orb.level * 100)).padStart(2, "0") + "%";
+    requestAnimationFrame(levelLoop);
+  })();
+  const pickVoice = () => { try { const vs = speechSynthesis.getVoices().filter((v) => /^pt/i.test(v.lang));
+    const rank = (v) => (/natural|online/i.test(v.name) ? 4 : 0) + (/antonio|daniel|google/i.test(v.name) ? 2 : 0) + (/pt-BR/i.test(v.lang) ? 1 : 0);
+    return vs.sort((a, b) => rank(b) - rank(a))[0] || null; } catch { return null; } };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function speakLine(text, my) {
+    sub.innerHTML = `<small>ORION</small>${text}`;
+    const v = "speechSynthesis" in window ? pickVoice() : null;
+    if (v) {
+      await new Promise((res) => { const u = new SpeechSynthesisUtterance(text); u.lang = v.lang; u.voice = v; u.rate = .96; u.pitch = /antonio|daniel/i.test(v.name) ? .92 : .85;
+        u.onboundary = () => { boost = .35; }; u.onend = u.onerror = res; speechSynthesis.speak(u); setTimeout(res, 14000); });
+    } else { for (let i = 0; i < text.split(" ").length && my === token; i++) { boost = .3; await wait(250); } }
+  }
+  async function talk() {
+    if (manual) { stop(); return; }
+    manual = true; const my = ++token; talking = false; audio(); chime(); orb.pulse();
+    btn.textContent = "■ Parar"; setState("listening"); sub.innerHTML = "<small>ORION</small>Inicializando a voz…"; await wait(700); if (my !== token) return;
+    setState("thinking"); await wait(700); if (my !== token) return;
+    talking = true; setState("speaking"); LINES[0] = `${greet()}, Senhor. Sistemas operacionais online.`;
+    for (const l of LINES) { if (my !== token) return; await speakLine(l, my); await wait(220); }
+    if (my === token) stop();
+  }
+  function stop() { token++; manual = false; talking = false; try { speechSynthesis.cancel(); } catch {} setState("idle"); sub.innerHTML = "<small>LEGENDA</small>Toque em “Ouvir o ORION” para ele se apresentar."; btn.textContent = "▶ Ouvir o ORION"; }
+  btn.addEventListener("click", talk);
+  try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch {}
+  setInterval(() => { $("#hud-ms").textContent = (34 + Math.round(Math.random() * 22)) + " ms"; }, 1700);
+  if (!reduce) { const cyc = ["idle", "listening", "thinking", "speaking", "idle"]; let ci = 0;
+    setInterval(() => { if (manual || talking) return; ci = (ci + 1) % cyc.length; setState(cyc[ci]); if (cyc[ci] === "speaking") { talking = true; setTimeout(() => { if (!manual) talking = false; }, 2600); } }, 3300); }
+
+  // ---------------- terminal digitando
+  (() => {
+    const el = $("#typed"), F = ["como está o tempo hoje?", "me lembra de pagar a luz às 18h30", "quanto eu gastei com mercado este mês?", "mostra um átomo de carbono em 3D", "toca a minha playlist de treino"];
+    if (reduce) { el.textContent = F[0]; return; }
+    let i = 0, j = 0, del = false;
+    (function tick() { const s = F[i]; el.textContent = s.slice(0, j);
+      if (!del && j < s.length) { j++; setTimeout(tick, 42); } else if (!del) { del = true; setTimeout(tick, 1700); }
+      else if (j > 0) { j--; setTimeout(tick, 16); } else { del = false; i = (i + 1) % F.length; setTimeout(tick, 280); } })();
+  })();
+
+  // ---------------- faixa rolando e ondas do card de voz
+  const items = ["Conversa por voz", "Briefing do dia", "Tarefas e lembretes", "Controle financeiro", "Treino 3D", "Hologramas", "Modo visual", "HUD", "Memória", "Gestos", "Backup criptografado", "4 personagens", "Despertador por palmas", "Player de música"];
+  $("#ticker").innerHTML = [...items, ...items].map((t) => `<span>${t}</span>`).join("");
+  $(".wave").innerHTML = Array.from({ length: 24 }, (_, i) => `<i style="animation-delay:${(i * 73 % 900) / 1000}s;height:${20 + (i * 37 % 70)}%"></i>`).join("");
+
+  // ---------------- painel (mock): inclina ao rolar, tarefas marcando, medidores e atividade
+  const mock = $("#mock");
+  function tiltMock() { if (reduce || !mock) return; const r = mock.getBoundingClientRect(), k = Math.min(1, Math.max(0, 1 - (r.top - innerHeight * .15) / (innerHeight * .75)));
+    mock.style.setProperty("--tilt", (16 * (1 - k)).toFixed(2) + "deg"); mock.style.setProperty("--sc", (.94 + .06 * k).toFixed(3)); }
+  tiltMock();
+  $("#gauges").innerHTML = [["CPU", 32], ["RAM", 54], ["DISCO", 71]].map(([n, v]) => `<div class="gauge"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="rgba(79,216,255,.15)" stroke-width="3"/>
+    <circle class="v" data-v="${v}" cx="20" cy="20" r="16" fill="none" stroke="${n === "DISCO" ? "#ffb84d" : "#4fd8ff"}" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="${100.5 * (1 - v / 100)}" transform="rotate(-90 20 20)"/>
+    <text x="20" y="23.5" text-anchor="middle" fill="#e3f7ff" font-size="9" font-family="Orbitron, sans-serif">${v}</text></svg>${n}</div>`).join("");
+  const feed = $("#m-feed"), EV = ["Lembrete criado: conta de luz", "Clima atualizado: 24°", "Gasto anotado: Mercado R$ 54", "Treino registrado: 40 min", "Memória guardada: aniversário", "Briefing do dia pronto", "Backup concluído"];
+  let ei = 0; const addEv = () => { const d = document.createElement("div"); d.textContent = EV[ei++ % EV.length]; feed.prepend(d); while (feed.children.length > 5) feed.lastElementChild.remove(); };
+  for (let k = 0; k < 4; k++) addEv();
+  if (!reduce) {
+    setInterval(addEv, 2600);
+    let tk = 1; setInterval(() => { const ts = [...document.querySelectorAll("#m-tasks .m-task")]; if (tk >= ts.length) { ts.slice(1).forEach((x) => x.classList.remove("done")); tk = 1; } else ts[tk++].classList.add("done");
+      $("#m-done").textContent = document.querySelectorAll("#m-tasks .done").length + "/4"; }, 2200);
+    setInterval(() => document.querySelectorAll(".gauge circle.v").forEach((c) => { const v = Math.max(8, Math.min(95, +c.dataset.v + (Math.random() * 16 - 8)));
+      c.setAttribute("stroke-dashoffset", 100.5 * (1 - v / 100)); c.nextElementSibling.textContent = Math.round(v); }), 1900);
+  }
+
+  // ---------------- personagens
+  const QUOTES = { orion: ["ORION DIZ", "Sistemas prontos, Senhor. Em que posso ajudar?"], lyra: ["LYRA DIZ", "Lyra na área, chefe. Bora trabalhar?"],
+    atlas: ["ATLAS DIZ", "Estou aqui. É um prazer ajudar."], vortex: ["VÓRTEX DIZ", "Vórtex online. Força total... ao seu dispor."] };
+  let pBoost = 0; (function pl() { pBoost *= .95; orb2.level = pBoost; requestAnimationFrame(pl); })();
+  $("#p-list").addEventListener("click", (e) => { const b = e.target.closest(".p-card"); if (!b) return; const id = b.dataset.p;
+    orb2.setLook(id); orb2.setState("speaking"); pBoost = .9; setTimeout(() => orb2.setState("idle"), 1500);
+    document.querySelectorAll(".p-card").forEach((x) => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-checked", on); });
+    const q = QUOTES[id], el = $("#p-quote"); el.innerHTML = `<small>${q[0]}</small>${q[1]}`; el.style.borderColor = getComputedStyle(b).getPropertyValue("--pc"); });
+
+  // ---------------- conversa de exemplo
+  (() => {
+    const box = $("#chat"), S = [
+      ["me", "Orion, bom dia! Como está o tempo?"],
+      ["ai", "Bom dia, Senhor. Agora faz 24 graus, com sol entre nuvens. Máxima de 29 e sem chuva prevista."],
+      ["me", "Me lembra de pagar a conta de luz às 18h30."],
+      ["tool", "🗓️ LEMBRETE CRIADO · HOJE 18:30"],
+      ["ai", "Feito. Às 18h30 eu te aviso, falando."],
+      ["me", "Gastei 54 reais no mercado, no débito."],
+      ["tool", "💰 GASTO ANOTADO · MERCADO · R$ 54,00"],
+      ["ai", "Anotado em Mercado. Este mês você já gastou R$ 412 nessa categoria."],
+      ["me", "Me mostra uma molécula de cafeína."],
+      ["tool", "🧊 HOLOGRAMA · CAFEÍNA (C8H10N4O2)"],
+      ["ai", "Pronto, está na tela. Clique em qualquer átomo para eu explicar."],
+    ];
+    const add = (who, text) => { const d = document.createElement("div");
+      if (who === "tool") { d.className = "tool"; d.textContent = text; } else { d.className = "msg " + who; d.innerHTML = who === "ai" ? `<b>ORION</b>${text}` : text; }
+      box.appendChild(d); while (box.children.length > 7) box.firstElementChild.remove(); };
+    S.slice(0, 5).forEach(([w, t]) => add(w, t));
+    if (reduce) return;
+    let i = 5;
+    const next = async () => { if (i >= S.length) { i = 0; box.innerHTML = ""; } const [w, t] = S[i++];
+      if (w === "ai") { const d = document.createElement("div"); d.className = "dots"; d.innerHTML = "<i></i><i></i><i></i>"; box.appendChild(d); await new Promise((r) => setTimeout(r, 1100)); d.remove(); }
+      add(w, t); setTimeout(next, w === "me" ? 900 : 2300); };
+    let started = false;
+    try { new IntersectionObserver((es) => { if (es[0].isIntersecting && !started) { started = true; setTimeout(next, 1200); } }).observe(box); } catch { setTimeout(next, 1500); }
+  })();
+
+  // ---------------- contadores (o número final já está no HTML; anima ao aparecer)
+  const fmt = (n) => n.toLocaleString("pt-BR");
+  try { const io = new IntersectionObserver((es) => es.forEach((e) => { if (!e.isIntersecting) return; io.unobserve(e.target); if (reduce) return;
+      const el = e.target, end = +el.dataset.count, plus = el.hasAttribute("data-plus"), t0 = performance.now();
+      (function run(now) { const k = Math.min(1, (now - t0) / 1500), v = Math.round(end * (1 - Math.pow(1 - k, 3))); el.textContent = fmt(v) + (plus ? "+" : ""); if (k < 1) requestAnimationFrame(run); })(t0); }), { threshold: .6 });
+    document.querySelectorAll("[data-count]").forEach((el) => io.observe(el)); } catch {}
+
+  // ---------------- entrada ao rolar (já visível; ganha o efeito ao aparecer)
+  try { const ro = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); ro.unobserve(e.target); } }), { threshold: .12 });
+    document.querySelectorAll(".rv").forEach((el) => ro.observe(el)); } catch {}
+
+  // ---------------- cartões inclinam e botões "magnéticos"
+  if (fine && !reduce) {
+    document.querySelectorAll(".tilt").forEach((c) => {
+      c.addEventListener("mousemove", (e) => { const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+        c.style.transform = `perspective(800px) rotateX(${-y * 7}deg) rotateY(${x * 9}deg) translateY(-6px)`; });
+      c.addEventListener("mouseleave", () => { c.style.transform = ""; });
+    });
+    document.querySelectorAll(".mag").forEach((b) => {
+      b.addEventListener("mousemove", (e) => { const r = b.getBoundingClientRect(); b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * .18}px, ${(e.clientY - r.top - r.height / 2) * .3}px)`; });
+      b.addEventListener("mouseleave", () => { b.style.transform = ""; });
+    });
+  }
+  // ---------------- 🪖 MODO HUD DO CAPACETE: a viseira fecha, acopla e abre com os indicadores ao vivo
+  (() => {
+    const hud = $("#hud"), btns = document.querySelectorAll("[data-hud]"), ret = $("#hud-ret"), tape = $("#hud-tape");
+    const DIRS = { 0: "N", 45: "NE", 90: "L", 135: "SE", 180: "S", 225: "SO", 270: "O", 315: "NO" };
+    tape.innerHTML = Array.from({ length: 73 * 2 }, (_, i) => { const d = (i % 72) * 5; return `<span class="${DIRS[d] ? "c" : ""}">${DIRS[d] || (d % 15 ? "" : d)}</span>`; }).join("");
+    const SECS = [["inicio", "NÚCLEO · INÍCIO"], ["painel", "O PAINEL"], ["recursos", "RECURSOS"], ["tudo", "MÓDULOS"], ["personagens", "PERSONAGENS"], ["seguranca", "SEGURANÇA"], ["preco", "PREÇO · LICENÇA"], ["faq", "DÚVIDAS"]];
+    let on = false, busy = false, raf = 0, mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my;
+    const setBtns = () => btns.forEach((b) => { b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); });
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const powerUp = () => { [220, 330, 440, 660, 880].forEach((f, i) => setTimeout(() => tone(f, .16, "sawtooth", .018, 1.3), i * 70)); setTimeout(chime, 420); };
+    const powerDown = () => { [880, 600, 400, 260].forEach((f, i) => setTimeout(() => tone(f, .18, "triangle", .03, .6), i * 80)); };
+    async function toggle() {
+      if (busy) return; busy = true; on = !on; setBtns();
+      try { localStorage.setItem("orion_hud", on ? "1" : "0"); } catch {}
+      const fl = $("#hud-flash");
+      if (on) {
+        powerUp(); hud.classList.add("on");
+        if (!reduce) { fl.innerHTML = "ACOPLANDO VISOR<b>HUD ONLINE</b>"; hud.classList.add("closing"); await wait(520); hud.classList.remove("closing"); hud.classList.add("opening"); await wait(120); }
+        hud.classList.add("live"); loop(); await wait(reduce ? 0 : 700); hud.classList.remove("opening");
+      } else {
+        powerDown();
+        if (!reduce) { fl.innerHTML = "DESACOPLANDO<b>HUD OFFLINE</b>"; hud.classList.add("closing"); await wait(480); }
+        hud.classList.remove("live"); cancelAnimationFrame(raf);
+        if (!reduce) { hud.classList.remove("closing"); hud.classList.add("opening"); await wait(600); hud.classList.remove("opening"); }
+        hud.classList.remove("on");
+      }
+      busy = false;
+    }
+    btns.forEach((b) => b.addEventListener("click", toggle));
+    addEventListener("pointermove", (e) => { mx = e.clientX; my = e.clientY; if (e.pointerType === "mouse") ret.classList.add("show"); }, { passive: true });
+    document.addEventListener("pointerover", (e) => ret.classList.toggle("hot", !!e.target.closest("a, button, canvas, .p-card, summary")));
+    const pad = (n) => String(n).padStart(2, "0");
+    let lastT = -1e9;
+    function loop(ts = 0) {
+      raf = requestAnimationFrame(loop);
+      const max = document.documentElement.scrollHeight - innerHeight, k = max > 0 ? scrollY / max : 0;
+      const hdg = (scrollY * .12) % 360; tape.style.transform = `translateX(${-(hdg / 5) * 40 + tape.parentElement.clientWidth / 2 - 20}px)`;
+      $("#hud-hdg").textContent = String(Math.round(hdg)).padStart(3, "0") + "°";
+      $("#hud-ptr").style.top = (k * 100) + "%"; $("#hud-pct").textContent = Math.round(k * 100) + "%";
+      rx += (mx - rx) * .2; ry += (my - ry) * .2; ret.style.transform = `translate(${rx}px, ${ry}px)`;
+      if (ts - lastT > 250) { lastT = ts;
+        const d = new Date(); $("#hud-clock").textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        $("#hud-date").textContent = d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" }).toUpperCase();
+        $("#hud-xy").textContent = `${Math.round(rx)} · ${Math.round(ry)}`;
+        const v = Math.round(orb.level * 100); $("#hud-v").textContent = pad(v) + "%"; $("#hud-vbar").style.setProperty("--w", Math.max(6, v) + "%");
+        $("#hud-net").textContent = $("#hud-ms").textContent;
+        let cur = SECS[0][1]; for (const [id, nm] of SECS) { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < innerHeight * .45) cur = nm; }
+        $("#hud-target").textContent = cur;
+      }
+    }
+    let saved = false; try { saved = localStorage.getItem("orion_hud") === "1"; } catch {}
+    if (saved) { on = true; setBtns(); hud.classList.add("on", "live"); loop(); }
+  })();
+
+  onScroll();
+})();
+</script>
+
+</body>
+</html>
