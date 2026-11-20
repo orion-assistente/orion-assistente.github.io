@@ -612,7 +612,7 @@ footer .wrap { display: grid; gap: 12px; }
     </nav>
     <button class="sound" id="sound" type="button" aria-pressed="false" title="Sons do painel"><i><b></b><b></b><b></b></i><span>SOM</span></button>
     <button class="hud-btn" type="button" data-hud aria-pressed="false" title="Ligar ou desligar o HUD do capacete"><span class="sw"></span><span class="lab">MODO HUD</span></button>
-    <a class="btn pri mag" href="#preco" data-buy>Quero o ORION</a>
+    <a class="btn pri mag" href="#preco">Quero o ORION</a>
   </div>
 </header>
 
@@ -626,7 +626,7 @@ footer .wrap { display: grid; gap: 12px; }
         <p class="lead rv">O ORION fala, ouve e age no seu computador. <b>Organiza o seu dia</b>, lembra das suas tarefas, controla gastos e treinos, mostra <b>hologramas 3D</b> e explica tudo em voz alta.</p>
         <div class="term rv" aria-live="polite"><span id="typed"></span></div>
         <div class="cta rv">
-          <a class="btn pri mag" href="#preco" data-buy>Garantir o meu ORION</a>
+          <a class="btn pri mag" href="#preco">Garantir o meu ORION</a>
           <a class="btn ghost mag" href="#painel">Ver o painel</a>
         </div>
         <div class="trust rv"><span>Pagamento único</span><span>7 dias de garantia</span><span>Atualizações incluídas</span><span>Suporte em português</span></div>
@@ -984,7 +984,7 @@ footer .wrap { display: grid; gap: 12px; }
       <span class="eyebrow">Sistemas prontos</span>
       <h2>Seu centro de comando com <span class="shine">inteligência artificial</span> está a um clique.</h2>
       <p>Instale hoje e comece a conversar com o ORION em poucos minutos.</p>
-      <div class="cta"><a class="btn pri mag" href="#preco" data-buy>Quero o ORION</a><a class="btn ghost mag" href="#faq">Tirar dúvidas</a></div>
+      <div class="cta"><a class="btn pri mag" href="#preco">Ver os planos</a><a class="btn ghost mag" href="#faq">Tirar dúvidas</a></div>
     </div>
   </section>
 </main>
@@ -1006,8 +1006,8 @@ footer .wrap { display: grid; gap: 12px; }
 <script>
 (() => {
   // ====== CONFIGURE AQUI ======
-  const CHECKOUT_URL = "";          // link de pagamento do plano ORION (Kiwify). Vazio = rola até o preço.
-  const CHECKOUT_ASSISTIDA = "";    // link de pagamento do ORION + instalação assistida
+  const CHECKOUT_URL = "https://pay.kiwify.com.br/5sADv9C";          // link de pagamento do plano ORION (Kiwify). Vazio = rola até o preço.
+  const CHECKOUT_ASSISTIDA = "https://pay.kiwify.com.br/vvLXj73";    // link de pagamento do ORION + instalação assistida
   // ============================
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
