@@ -1186,11 +1186,11 @@ footer .wrap { display: grid; gap: 12px; }
     orb.level = Math.min(1, base); $("#hud-level").textContent = String(Math.round(orb.level * 100)).padStart(2, "0") + "%";
     requestAnimationFrame(levelLoop);
   })();
-  // voz gravada da apresentação (arquivos em voz/); a esfera pulsa com o volume real da fala
+  // voz gravada da apresentação (arquivos .mp3 ao lado do index.html); a esfera pulsa com o volume real da fala
   const voiceEl = () => { if (!va) { va = new Audio(); va.preload = "auto";
       try { const c = audio(); if (c) { const src = c.createMediaElementSource(va); an = c.createAnalyser(); an.fftSize = 512; abuf = new Uint8Array(an.fftSize); src.connect(an); an.connect(c.destination); } } catch {} }
     return va; };
-  const CLIP = (i) => i ? `voz/l${i}.mp3` : `voz/ola-${new Date().getHours() < 12 ? "dia" : new Date().getHours() < 18 ? "tarde" : "noite"}.mp3`;
+  const CLIP = (i) => i ? `l${i}.mp3` : `ola-${new Date().getHours() < 12 ? "dia" : new Date().getHours() < 18 ? "tarde" : "noite"}.mp3`;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   async function speakLine(text, my, i) {
     sub.innerHTML = `<small>ORION</small>${text}`;
