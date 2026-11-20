@@ -1177,24 +1177,26 @@ footer .wrap { display: grid; gap: 12px; }
   const stateEl = $("#state"), sub = $("#subtitle"), btn = $("#speak");
   const STATES = { idle: ["EM ESPERA", "var(--cyan)"], listening: ["OUVINDO", "var(--green)"], thinking: ["PROCESSANDO", "var(--gold)"], speaking: ["FALANDO", "var(--ice)"] };
   const setState = (s) => { orb.setState(s); stateEl.innerHTML = `<i></i>${STATES[s][0]}`; stateEl.style.color = STATES[s][1]; };
-  let talking = false, manual = false, pulseT = 0, boost = 0, token = 0;
+  let talking = false, manual = false, pulseT = 0, boost = 0, token = 0, va = null, an = null, abuf = null;
   (function levelLoop() {
     pulseT += .016; boost *= .9;
     const base = talking ? .3 + .24 * Math.abs(Math.sin(pulseT * 7.3)) * Math.abs(Math.sin(pulseT * 2.1 + 1)) + boost : 0;
+    if (an && va && !va.paused) { an.getByteTimeDomainData(abuf); let q = 0; for (let i = 0; i < abuf.length; i++) { const x = (abuf[i] - 128) / 128; q += x * x; }
+      boost = Math.max(boost, Math.min(.6, Math.sqrt(q / abuf.length) * 3.2)); }
     orb.level = Math.min(1, base); $("#hud-level").textContent = String(Math.round(orb.level * 100)).padStart(2, "0") + "%";
     requestAnimationFrame(levelLoop);
   })();
-  const pickVoice = () => { try { const vs = speechSynthesis.getVoices().filter((v) => /^pt/i.test(v.lang));
-    const rank = (v) => (/natural|online/i.test(v.name) ? 4 : 0) + (/antonio|daniel|google/i.test(v.name) ? 2 : 0) + (/pt-BR/i.test(v.lang) ? 1 : 0);
-    return vs.sort((a, b) => rank(b) - rank(a))[0] || null; } catch { return null; } };
+  // voz gravada da apresentação (arquivos em voz/); a esfera pulsa com o volume real da fala
+  const voiceEl = () => { if (!va) { va = new Audio(); va.preload = "auto";
+      try { const c = audio(); if (c) { const src = c.createMediaElementSource(va); an = c.createAnalyser(); an.fftSize = 512; abuf = new Uint8Array(an.fftSize); src.connect(an); an.connect(c.destination); } } catch {} }
+    return va; };
+  const CLIP = (i) => i ? `voz/l${i}.mp3` : `voz/ola-${new Date().getHours() < 12 ? "dia" : new Date().getHours() < 18 ? "tarde" : "noite"}.mp3`;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  async function speakLine(text, my) {
+  async function speakLine(text, my, i) {
     sub.innerHTML = `<small>ORION</small>${text}`;
-    const v = "speechSynthesis" in window ? pickVoice() : null;
-    if (v) {
-      await new Promise((res) => { const u = new SpeechSynthesisUtterance(text); u.lang = v.lang; u.voice = v; u.rate = .96; u.pitch = /antonio|daniel/i.test(v.name) ? .92 : .85;
-        u.onboundary = () => { boost = .35; }; u.onend = u.onerror = res; speechSynthesis.speak(u); setTimeout(res, 14000); });
-    } else { for (let i = 0; i < text.split(" ").length && my === token; i++) { boost = .3; await wait(250); } }
+    const ok = await new Promise((res) => { const a = voiceEl(); let done = false; const fim = (v) => { if (!done) { done = true; res(v); } };
+      a.onended = () => fim(true); a.onerror = () => fim(false); a.src = CLIP(i); a.play().catch(() => fim(false)); setTimeout(() => fim(true), 15000); });
+    if (!ok) { for (let k = 0; k < text.split(" ").length && my === token; k++) { boost = .3; await wait(250); } }  // sem áudio: só a legenda
   }
   async function talk() {
     if (manual) { stop(); return; }
@@ -1202,12 +1204,11 @@ footer .wrap { display: grid; gap: 12px; }
     btn.textContent = "■ Parar"; setState("listening"); sub.innerHTML = "<small>ORION</small>Inicializando a voz…"; await wait(700); if (my !== token) return;
     setState("thinking"); await wait(700); if (my !== token) return;
     talking = true; setState("speaking"); LINES[0] = `${greet()}, Senhor. Sistemas operacionais online.`;
-    for (const l of LINES) { if (my !== token) return; await speakLine(l, my); await wait(220); }
+    for (let i = 0; i < LINES.length; i++) { if (my !== token) return; await speakLine(LINES[i], my, i); await wait(260); }
     if (my === token) stop();
   }
-  function stop() { token++; manual = false; talking = false; try { speechSynthesis.cancel(); } catch {} setState("idle"); sub.innerHTML = "<small>LEGENDA</small>Toque em “Ouvir o ORION” para ele se apresentar."; btn.textContent = "▶ Ouvir o ORION"; }
+  function stop() { token++; manual = false; talking = false; try { if (va) va.pause(); } catch {} setState("idle"); sub.innerHTML = "<small>LEGENDA</small>Toque em “Ouvir o ORION” para ele se apresentar."; btn.textContent = "▶ Ouvir o ORION"; }
   btn.addEventListener("click", talk);
-  try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = () => {}; } catch {}
   setInterval(() => { $("#hud-ms").textContent = (34 + Math.round(Math.random() * 22)) + " ms"; }, 1700);
   if (!reduce) { const cyc = ["idle", "listening", "thinking", "speaking", "idle"]; let ci = 0;
     setInterval(() => { if (manual || talking) return; ci = (ci + 1) % cyc.length; setState(cyc[ci]); if (cyc[ci] === "speaking") { talking = true; setTimeout(() => { if (!manual) talking = false; }, 2600); } }, 3300); }
